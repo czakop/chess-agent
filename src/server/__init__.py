@@ -7,7 +7,8 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from websockets.asyncio.server import serve
 
-from llm_service import ModelProvider, TemplateType, llm_move
+from ..llm.prompts import TemplateType
+from ..llm.service import ModelProvider, llm_move
 
 load_dotenv()
 
@@ -84,7 +85,7 @@ async def websocket_handler(websocket):
 
 
 async def index(request):
-    return web.FileResponse("index.html")
+    return web.FileResponse("src/server/index.html")
 
 
 async def main():
@@ -104,7 +105,3 @@ async def main():
     print("HTTP server running on http://localhost:8080")
 
     await asyncio.Event().wait()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

@@ -1,9 +1,10 @@
 from enum import Enum
 
 import chess
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
+
+from .prompts import TemplateType, get_template
 
 
 class ModelProvider(str, Enum):
@@ -11,31 +12,10 @@ class ModelProvider(str, Enum):
     OLLAMA = "ollama"
 
 
-class TemplateType(str, Enum):
-    MOVES = "moves"
-    STATE = "state"
-
-
 class ChessMove(BaseModel):
     move: str = Field(
         description="Algebraic notation of your next move (e.g., e5 or Nf6)"
     )
-
-
-system_message = "You are a professional chess player. You are playing a chess game with the black pieces."
-template_moves = """Here is the list of moves happened so far:
-
-{moves}
-
-Make your next move."""
-
-template_state = """Here is the state of the chess game:
-
-{state}
-
-In this mapping, the keys are the square names and the values are the pieces on those squares.
-
-Make your next move."""
 
 
 def _get_moves_str(board: chess.Board) -> str:
@@ -74,15 +54,10 @@ def _invoke_model(
 ) -> ChessMove:
     match template_type:
         case TemplateType.MOVES:
-            template = template_moves
             input = {"moves": _get_moves_str(board)}
         case TemplateType.STATE:
-            template = template_state
             input = {"state": _get_state_str(board)}
-    prompt_template = ChatPromptTemplate(
-        [("system", system_message), ("user", template)]
-    )
-    chain = prompt_template | model
+    chain = get_template(template_type) | model
     return chain.invoke(input)
 
 
