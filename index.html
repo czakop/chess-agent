@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <title>Simple Chess GUI</title>
+  <script src="https://code.jquery.com/jquery-3.5.1.min.js"
+    integrity="sha384-ZvpUoO/+PpLXR1lu4jmpXWu80pZlYUAfxl5NsBMWOEPSjUn/6Z/hRTt8+pR6L4N2"
+    crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"
+    integrity="sha384-q94+BZtLrkL1/ohfjR8c6L+A6qzNH9R2hBLwyoAfu3i/WCvQjzL2RQJ3uNHDISdU" crossorigin="anonymous">
+  <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"
+    integrity="sha384-8Vi8VHwn3vjQ9eUHUxex3JSN/NFqUg3QbPyX8kWyb93+8AC/pPWTzj+nHtbC5bxD"
+    crossorigin="anonymous"></script>
+  <style>
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #f0f0f0;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="board" style="width: 400px;"></div>
+
+  <script>
+    var board = Chessboard('board', {
+      draggable: true,
+      position: 'start',
+      pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+      onDrop: onDrop,
+    });
+
+    function onDrop(source, target) {
+      move = {
+        "id": board_id,
+        "action": "MOVE",
+        "move": { source, target }
+      }
+      console.log("sending move:", move)
+      try {
+        sendMessage(move)
+      } catch (error) {
+        console.error(error.data)
+        return 'snapback'
+      }
+    }
+
+
+    const wsUrl = "ws://localhost:8765";
+    const socket = new WebSocket(wsUrl);
+    var board_id = null
+
+    socket.onopen = function (event) {
+      console.log("WebSocket connection established.");
+    };
+
+    socket.onmessage = function (event) {
+      try {
+        const msg = JSON.parse(event.data);
+        console.log("Received message:", msg);
+        if (msg.action == "START") {
+          board_id = msg.id
+          console.log("Game has been started with board id:", board_id)
+        }
+        else if (msg.action == "MOVE") {
+          board.move(`${msg.move.source}-${msg.move.target}`)
+        } else {
+          board.position(msg.fen)
+        }
+      } catch (error) {
+        console.error("Error parsing message:", error);
+      }
+    };
+
+    socket.onerror = function (error) {
+      console.error("WebSocket error:", error);
+    };
+
+    socket.onclose = function (event) {
+      console.log("WebSocket connection closed:", event);
+    };
+
+    function sendMessage(message) {
+      if (socket.readyState === WebSocket.OPEN) {
+        socket.send(JSON.stringify(message));
+      } else {
+        console.error("WebSocket is not open. ReadyState:", socket.readyState);
+      }
+    }
+  </script>
+</body>
+
+</html>
