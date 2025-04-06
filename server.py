@@ -3,10 +3,13 @@ import uuid
 
 import chess
 from aiohttp import web
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from websockets.asyncio.server import serve
 
-from llm_service import llm_move
+from llm_service import ModelProvider, llm_move
+
+load_dotenv()
 
 
 class Move(BaseModel):
@@ -57,7 +60,7 @@ async def websocket_handler(websocket):
                     ).model_dump_json()
                 )
 
-                next_move = llm_move(board)
+                next_move = llm_move(board, ModelProvider.OPENAI, "gpt-4o-mini")
                 move = board.push_san(next_move.move.strip())
                 await websocket.send(
                     DTO(

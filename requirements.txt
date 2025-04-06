@@ -1,5 +1,7 @@
 websockets
 aiohttp
+python-dotenv
 chess
 langchain
 langchain-ollama
+langchain-openai

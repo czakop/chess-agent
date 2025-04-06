@@ -1,7 +1,14 @@
+from enum import Enum
+
 import chess
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_ollama import ChatOllama
+from langchain_core.runnables import Runnable
 from pydantic import BaseModel, Field
+
+
+class ModelProvider(str, Enum):
+    OPENAI = "openai"
+    OLLAMA = "ollama"
 
 
 class ChessMove(BaseModel):
@@ -24,11 +31,22 @@ def _get_moves(board: chess.Board) -> str:
     return chess.Board().variation_san(board.move_stack)
 
 
-def _get_model(model_name):
-    return prompt_template | ChatOllama(model=model_name).with_structured_output(
-        ChessMove
-    )
+def _get_model(provider: ModelProvider, model_name: str) -> Runnable:
+    match provider:
+        case ModelProvider.OPENAI:
+            from langchain_openai import ChatOpenAI
+
+            model = ChatOpenAI(model=model_name)
+        case ModelProvider.OLLAMA:
+            from langchain_ollama import ChatOllama
+
+            model = ChatOllama(model=model_name)
+        case _:
+            raise ValueError(f"Unsupported model provider: {provider}")
+    return prompt_template | model.with_structured_output(ChessMove)
 
 
-def llm_move(board, model_name="llama3.2"):
-    return _get_model(model_name).invoke({"moves": _get_moves(board)})
+def llm_move(
+    board: chess.Board, model_provider: ModelProvider, model_name: str = "llama3.2"
+) -> ChessMove:
+    return _get_model(model_provider, model_name).invoke({"moves": _get_moves(board)})
