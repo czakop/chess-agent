@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 from websockets.asyncio.server import serve
 
-from llm_service import ModelProvider, llm_move
+from llm_service import ModelProvider, TemplateType, llm_move
 
 load_dotenv()
 
@@ -60,7 +60,9 @@ async def websocket_handler(websocket):
                     ).model_dump_json()
                 )
 
-                next_move = llm_move(board, ModelProvider.OPENAI, "gpt-4o-mini")
+                next_move = llm_move(
+                    board, ModelProvider.OPENAI, "gpt-4o-mini", TemplateType.STATE
+                )
                 move = board.push_san(next_move.move.strip())
                 await websocket.send(
                     DTO(
