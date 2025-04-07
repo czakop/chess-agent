@@ -7,7 +7,7 @@ from langchain_core.tools import BaseTool
 
 from .model import ChessMove
 from .prompts import TemplateType, get_template
-from .tools import make_move, square_info_tool_factory
+from .tools import legal_moves_tool_factory, make_move, square_info_tool_factory
 
 
 class ModelProvider(str, Enum):
@@ -71,9 +71,10 @@ def llm_move(
     board: chess.Board,
     model_provider: ModelProvider,
     model_name: str = "llama3.2",
-    template_type: TemplateType = TemplateType.MOVES,
+    template_type: TemplateType = TemplateType.STATE,
 ):
     tools = {
+        "legal_moves": legal_moves_tool_factory(board),
         "square_info": square_info_tool_factory(board),
         "make_move": make_move,
     }

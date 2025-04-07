@@ -26,15 +26,29 @@ def square_info_tool_factory(board: chess.Board) -> BaseTool:
         square = chess.parse_square(square_name)
         return "\n".join(
             [
-                f"Square: {chess.square_name(square)}",
                 f"Piece: {_get_piece_info_on_square(board, square)}",
-                f"Legal moves: {_legal_moves_from_square(board, square)}",
                 f"White attackers: {_get_attackers(board, square, chess.WHITE)}",
                 f"Black attackers: {_get_attackers(board, square, chess.BLACK)}",
             ]
         )
 
     return square_info
+
+
+def legal_moves_tool_factory(board: chess.Board) -> BaseTool:
+
+    @tool
+    def legal_moves(square_name: str) -> str:
+        """
+        Get legal moves from a square on the chessboard.
+
+        Args:
+            square_name (str): The name of the square (e.g., e4, f6).
+        """
+        square = chess.parse_square(square_name)
+        return f"Legal moves from {chess.square_name(square)}: {_legal_moves_from_square(board, square)}"
+
+    return legal_moves
 
 
 def _get_color_name(color: chess.Color) -> str:
