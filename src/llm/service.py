@@ -8,6 +8,7 @@ from langchain_core.tools import BaseTool
 from .model import ChessMove
 from .prompts import TemplateType, get_template
 from .tools import legal_moves_tool_factory, make_move, square_info_tool_factory
+from .utils import get_color_name
 
 
 class ModelProvider(str, Enum):
@@ -56,11 +57,12 @@ def _invoke_model(
     template_type: TemplateType = TemplateType.STATE,
     tool_messages: list[ToolMessage] | None = None,
 ):
+    side_to_move = get_color_name(board.turn)
     match template_type:
         case TemplateType.MOVES:
-            input = {"moves": _get_moves_str(board)}
+            input = {"moves": _get_moves_str(board), "side_to_move": side_to_move}
         case TemplateType.STATE:
-            input = {"state": _get_state_str(board)}
+            input = {"state": _get_state_str(board), "side_to_move": side_to_move}
     if not tool_messages:
         tool_messages = []
     chain = get_template(template_type, tool_messages) | model
@@ -98,3 +100,26 @@ def llm_move(
                 messages.append(tool_response)
         else:
             raise ValueError("No tool calls found in the response.")
+
+
+def llm_message(
+    board: chess.Board,
+    user_message: str,
+    model_provider: ModelProvider,
+    model_name: str = "llama3.2",
+    template_type: TemplateType = TemplateType.STATE,
+):
+    tools = {
+        # "legal_moves": legal_moves_tool_factory(board),
+        # "square_info": square_info_tool_factory(board),
+        # "make_move": make_move,
+    }
+
+    model = _get_model(model_provider, model_name, list(tools.values()))
+    messages = []
+
+    print("Invoking model...")
+    response = _invoke_model(model, board, template_type, messages)
+    messages.append(response)
+
+    return response

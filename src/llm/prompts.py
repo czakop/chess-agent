@@ -3,24 +3,27 @@ from enum import Enum
 from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
 
-SYSTEM_MESSAGE = """
-You are a professional chess player. You are playing a chess game with the black pieces.
-Use the square_info tool to get information about a square on the chessboard before making a move.
+SYSTEM_MESSAGE = """You are a highly intelligent and expert-level chess assistant.
+When asked to make a move, you will provide the best possible move for the given position.
+You may use tools to get information about the chessboard, such as legal moves or attackers/defenders of a square.
+You make your move using the make_move tool.
 """
 
 TEMPLATE_MOVES = """Here is the list of moves happened so far:
 
 {moves}
 
-Make your next move."""
+It is {side_to_move}'s turn.
 
-TEMPLATE_STATE = """Here is the state of the chess game:
+Make the best move for {side_to_move}"""
+
+TEMPLATE_STATE = """Here is the current state of the chess game:
 
 {state}
 
-In this mapping, the keys are the square names and the values are the pieces on those squares.
+It is {side_to_move}'s turn.
 
-Make your next move."""
+Make the best move for {side_to_move}."""
 
 
 class TemplateType(str, Enum):

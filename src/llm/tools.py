@@ -1,6 +1,8 @@
 import chess
 from langchain_core.tools import BaseTool, tool
 
+from .utils import get_color_name
+
 
 @tool
 def make_move(move: str) -> str:
@@ -51,15 +53,11 @@ def legal_moves_tool_factory(board: chess.Board) -> BaseTool:
     return legal_moves
 
 
-def _get_color_name(color: chess.Color) -> str:
-    return "white" if color == chess.WHITE else "black"
-
-
 def _get_piece_info_on_square(board: chess.Board, square: chess.Square) -> str:
     piece = board.piece_at(square)
     if piece is None:
         return f"No piece on {chess.square_name(square)}"
-    color = _get_color_name(piece.color)
+    color = get_color_name(piece.color)
     return f"There is a {color} {chess.piece_name(piece.piece_type)} on {chess.square_name(square)}."
 
 
@@ -72,7 +70,7 @@ def _legal_moves_from_square(board: chess.Board, square: chess.Square) -> str:
 
 def _get_attackers(board: chess.Board, square: chess.Square, color: chess.Color) -> str:
     attackers = board.attackers(color, square)
-    color_name = _get_color_name(color)
+    color_name = get_color_name(color)
     if not attackers:
         return f"No {color_name} attackers for {chess.square_name(square)}"
     return ", ".join(
