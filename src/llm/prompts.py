@@ -5,35 +5,26 @@ from langchain_core.prompts import ChatPromptTemplate
 
 SYSTEM_MESSAGE = """You are a highly intelligent and expert-level chess assistant.
 When asked to make a move, you will provide the best possible move for the given position.
-You may use tools to get information about the chessboard, such as legal moves or attackers/defenders of a square.
+You may use tools to get information about the chessboard, such as current state, legal moves or attackers/defenders of a square.
+Do NOT say anything about the position or make any move without using the tools.
 You make your move using the make_move tool.
 """
 
-TEMPLATE_MOVES = """Here is the list of moves happened so far:
-
-{moves}
-
-It is {side_to_move}'s turn.
-
-Make the best move for {side_to_move}"""
-
-TEMPLATE_STATE = """Here is the current state of the chess game:
-
-{state}
-
-It is {side_to_move}'s turn.
-
-Make the best move for {side_to_move}."""
+TEMPLATE_STATE = "Make the best move for {side_to_move}."
 
 
 class TemplateType(str, Enum):
-    MOVES = TEMPLATE_MOVES
     STATE = TEMPLATE_STATE
 
 
 def get_template(
-    template_type: TemplateType, extra_messages: list[BaseMessage]
+    message_history: list[BaseMessage],
+    template_type: TemplateType | None,
+    extra_messages: list[BaseMessage],
 ) -> ChatPromptTemplate:
-    return ChatPromptTemplate(
-        [("system", SYSTEM_MESSAGE), ("user", template_type.value), *extra_messages]
-    )
+    messages = [("system", SYSTEM_MESSAGE)]
+    messages.extend(message_history)
+    if template_type:
+        messages.append(("user", template_type.value))
+    messages.extend(extra_messages)
+    return ChatPromptTemplate(messages)

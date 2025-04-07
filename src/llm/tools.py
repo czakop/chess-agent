@@ -15,6 +15,30 @@ def make_move(move: str) -> str:
     return move
 
 
+def board_state_tool_factory(board: chess.Board) -> BaseTool:
+
+    @tool
+    def board_state() -> str:
+        """
+        Get the current state of the chessboard.
+        """
+        piece_map = "\n".join(
+            [
+                f"{chess.square_name(s)}: {"white" if p.color == chess.WHITE else "black"} {chess.piece_name(p.piece_type)}"
+                for s, p in board.piece_map().items()
+                if p
+            ]
+        )
+
+        return f"""Here is the current state of the chess game:
+
+        {piece_map}
+
+        It is {get_color_name(board.turn)}'s turn."""
+
+    return board_state
+
+
 def square_info_tool_factory(board: chess.Board) -> BaseTool:
 
     @tool

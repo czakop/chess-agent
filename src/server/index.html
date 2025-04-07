@@ -27,8 +27,8 @@
       justify-content: space-between;
       align-items: stretch;
       width: 60%;
+      height: 600px;
       margin: 0 auto;
-      min-height: 600px;
       border: 1px solid #ccc;
     }
 
@@ -71,6 +71,69 @@
     .button-container button:hover {
       background-color: #0056b3;
     }
+
+    .chat-container {
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      background-color: #fff;
+      border-left: 1px solid #ccc;
+      box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+    }
+
+    .chat-history {
+      flex: 1;
+      padding: 10px;
+      overflow-y: auto;
+      border-bottom: 1px solid #ccc;
+    }
+
+    .chat-message {
+      margin: 5px 0;
+      padding: 8px;
+      border-radius: 5px;
+      background-color: #f1f1f1;
+    }
+
+    .chat-message.sent {
+      background-color: #bae798;
+      margin-left: auto;
+      text-align: right;
+    }
+
+    .chat-message.received {
+      background-color: #f1f0f0;
+      margin-right: auto;
+      text-align: left;
+    }
+
+    .chat-input {
+      display: flex;
+      padding: 10px;
+    }
+
+    .chat-input input {
+      flex: 1;
+      padding: 5px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+
+    .chat-input button {
+      padding: 5px 10px;
+      margin-left: 5px;
+      font-size: 14px;
+      border: none;
+      background-color: #007BFF;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .chat-input button:hover {
+      background-color: #0056b3;
+    }
   </style>
 </head>
 
@@ -85,6 +148,13 @@
         <button id="editBtn">Edit Board</button>
         <button id="startBtn" hidden="true">Start Position</button>
         <button id="clearBtn" hidden="true">Clear Board</button>
+      </div>
+    </div>
+    <div class="chat-container">
+      <div class="chat-history" id="chatHistory"></div>
+      <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Type your message...">
+        <button id="sendBtn">Send</button>
       </div>
     </div>
   </div>
@@ -162,6 +232,8 @@
         }
         else if (msg.action == "MOVE") {
           board.move(`${msg.move.source}-${msg.move.target}`)
+        } else if (msg.action == "CHAT") {
+          appendMessage(msg.text, 'received');
         } else {
           board.position(msg.fen)
         }
@@ -185,6 +257,37 @@
         console.error("WebSocket is not open. ReadyState:", socket.readyState);
       }
     }
+
+    const sendBtn = document.getElementById('sendBtn');
+    const chatInput = document.getElementById('chatInput');
+    const chatHistory = document.getElementById('chatHistory');
+
+    function appendMessage(message, type = 'sent') {
+      const messageElem = document.createElement('div');
+      messageElem.classList.add('chat-message', type);
+      messageElem.textContent = message;
+      chatHistory.appendChild(messageElem);
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+
+    sendBtn.addEventListener('click', () => {
+      const message = chatInput.value.trim();
+      if (message !== "") {
+        appendMessage(message, 'sent');
+        chatInput.value = "";
+        sendMessage({
+          "id": board_id,
+          "action": "CHAT",
+          "text": message
+        });
+      }
+    });
+
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        sendBtn.click();
+      }
+    });
   </script>
 </body>
 

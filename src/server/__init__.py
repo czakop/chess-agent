@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from websockets.asyncio.server import serve
 
 from ..llm.prompts import TemplateType
-from ..llm.service import ModelProvider, llm_move
+from ..llm.service import ModelProvider, llm_message, llm_move
 
 load_dotenv()
 
@@ -28,17 +28,20 @@ class Move(BaseModel):
 class DTO(BaseModel):
     id: str | None
     action: str
-    move: Move | None
+    move: Move | None = None
     fen: str | None = None
+    text: str | None = None
 
 
 games = {}
+chat_messages = {}
 
 
 async def websocket_handler(websocket):
     board_id = str(uuid.uuid4())
     board = chess.Board()
     games[board_id] = board
+    chat_messages[board_id] = []
     await websocket.send(
         DTO(
             id=board_id,
@@ -66,6 +69,7 @@ async def websocket_handler(websocket):
         elif request.action == "MOVE":
             assert request.id and request.id in games
             board: chess.Board = games[request.id]
+            chat_history = chat_messages[request.id]
             try:
                 move = board.push_uci(request.move.to_uci())
                 await websocket.send(
@@ -77,7 +81,11 @@ async def websocket_handler(websocket):
                 )
 
                 next_move = llm_move(
-                    board, ModelProvider.OPENAI, "gpt-4o-mini", TemplateType.STATE
+                    board,
+                    chat_history,
+                    ModelProvider.OPENAI,
+                    "gpt-4o-mini",
+                    TemplateType.STATE,
                 )
                 move = board.push_san(next_move.move.strip())
                 await websocket.send(
@@ -85,6 +93,35 @@ async def websocket_handler(websocket):
                         id=request.id,
                         action="MOVE",
                         move=Move.from_uci(move.uci()),
+                    ).model_dump_json()
+                )
+            except Exception as e:
+                print(e)
+                await websocket.send(
+                    DTO(
+                        id=request.id,
+                        action="ERROR",
+                        move=None,
+                        fen=board.fen(),
+                    ).model_dump_json()
+                )
+        elif request.action == "CHAT":
+            assert request.id and request.id in games
+            board: chess.Board = games[request.id]
+            message_history = chat_messages[request.id]
+            try:
+                response = llm_message(
+                    board,
+                    message_history,
+                    request.text,
+                    ModelProvider.OPENAI,
+                    "gpt-4o-mini",
+                )
+                await websocket.send(
+                    DTO(
+                        id=request.id,
+                        action="CHAT",
+                        text=response.content,
                     ).model_dump_json()
                 )
             except Exception as e:

@@ -1,33 +1,24 @@
 from enum import Enum
 
 import chess
-from langchain_core.messages import ToolMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 
 from .model import ChessMove
 from .prompts import TemplateType, get_template
-from .tools import legal_moves_tool_factory, make_move, square_info_tool_factory
+from .tools import (
+    board_state_tool_factory,
+    legal_moves_tool_factory,
+    make_move,
+    square_info_tool_factory,
+)
 from .utils import get_color_name
 
 
 class ModelProvider(str, Enum):
     OPENAI = "openai"
     OLLAMA = "ollama"
-
-
-def _get_moves_str(board: chess.Board) -> str:
-    return chess.Board().variation_san(board.move_stack)
-
-
-def _get_state_str(board: chess.Board) -> str:
-    return "\n".join(
-        [
-            f"{chess.square_name(s)}: {"white" if p.color == chess.WHITE else "black"} {chess.piece_name(p.piece_type)}"
-            for s, p in board.piece_map().items()
-            if p
-        ]
-    )
 
 
 def _get_model(
@@ -54,28 +45,30 @@ def _get_model(
 def _invoke_model(
     model: Runnable,
     board: chess.Board,
-    template_type: TemplateType = TemplateType.STATE,
+    template: TemplateType | None = None,
+    message_history: list[BaseMessage] | None = None,
     tool_messages: list[ToolMessage] | None = None,
 ):
     side_to_move = get_color_name(board.turn)
-    match template_type:
-        case TemplateType.MOVES:
-            input = {"moves": _get_moves_str(board), "side_to_move": side_to_move}
-        case TemplateType.STATE:
-            input = {"state": _get_state_str(board), "side_to_move": side_to_move}
+    input = {"side_to_move": side_to_move}
     if not tool_messages:
         tool_messages = []
-    chain = get_template(template_type, tool_messages) | model
+    if not message_history:
+        message_history = []
+    chain = get_template(message_history, template, tool_messages) | model
+    print("Invoking model...")
     return chain.invoke(input)
 
 
 def llm_move(
     board: chess.Board,
+    message_history: list[BaseMessage],
     model_provider: ModelProvider,
     model_name: str = "llama3.2",
     template_type: TemplateType = TemplateType.STATE,
 ):
     tools = {
+        "board_state": board_state_tool_factory(board),
         "legal_moves": legal_moves_tool_factory(board),
         "square_info": square_info_tool_factory(board),
         "make_move": make_move,
@@ -85,8 +78,13 @@ def llm_move(
     messages = []
 
     while True:
-        print("Invoking model...")
-        response = _invoke_model(model, board, template_type, messages)
+        response = _invoke_model(
+            model,
+            board,
+            template_type,
+            message_history=message_history,
+            tool_messages=messages,
+        )
         messages.append(response)
 
         if response.tool_calls:
@@ -104,22 +102,37 @@ def llm_move(
 
 def llm_message(
     board: chess.Board,
+    message_history: list[BaseMessage],
     user_message: str,
     model_provider: ModelProvider,
     model_name: str = "llama3.2",
-    template_type: TemplateType = TemplateType.STATE,
-):
+) -> AIMessage:
     tools = {
-        # "legal_moves": legal_moves_tool_factory(board),
-        # "square_info": square_info_tool_factory(board),
-        # "make_move": make_move,
+        "board_state": board_state_tool_factory(board),
+        "legal_moves": legal_moves_tool_factory(board),
+        "square_info": square_info_tool_factory(board),
     }
 
     model = _get_model(model_provider, model_name, list(tools.values()))
     messages = []
+    message_history.append(HumanMessage(content=user_message))
 
-    print("Invoking model...")
-    response = _invoke_model(model, board, template_type, messages)
-    messages.append(response)
+    while True:
+        response = _invoke_model(
+            model,
+            board,
+            message_history=message_history,
+            tool_messages=messages,
+        )
+        messages.append(response)
 
-    return response
+        if response.tool_calls:
+            for tool_call in response.tool_calls:
+                print("Tool call:", tool_call)
+                tool = tools[tool_call["name"]]
+                tool_response = tool.invoke(tool_call)
+                print("Tool response:", tool_response.content)
+                messages.append(tool_response)
+        else:
+            message_history.append(response)
+            return response
