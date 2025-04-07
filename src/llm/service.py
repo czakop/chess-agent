@@ -1,21 +1,18 @@
 from enum import Enum
 
 import chess
+from langchain_core.messages import ToolMessage
 from langchain_core.runnables import Runnable
-from pydantic import BaseModel, Field
+from langchain_core.tools import BaseTool
 
+from .model import ChessMove
 from .prompts import TemplateType, get_template
+from .tools import make_move, square_info_tool_factory
 
 
 class ModelProvider(str, Enum):
     OPENAI = "openai"
     OLLAMA = "ollama"
-
-
-class ChessMove(BaseModel):
-    move: str = Field(
-        description="Algebraic notation of your next move (e.g., e5 or Nf6)"
-    )
 
 
 def _get_moves_str(board: chess.Board) -> str:
@@ -32,7 +29,9 @@ def _get_state_str(board: chess.Board) -> str:
     )
 
 
-def _get_model(provider: ModelProvider, model_name: str) -> Runnable:
+def _get_model(
+    provider: ModelProvider, model_name: str, tools: list[BaseTool]
+) -> Runnable:
     match provider:
         case ModelProvider.OPENAI:
             from langchain_openai import ChatOpenAI
@@ -44,20 +43,27 @@ def _get_model(provider: ModelProvider, model_name: str) -> Runnable:
             model = ChatOllama(model=model_name)
         case _:
             raise ValueError(f"Unsupported model provider: {provider}")
-    return model.with_structured_output(ChessMove)
+
+    if tools:
+        model = model.bind_tools(tools)
+
+    return model
 
 
 def _invoke_model(
     model: Runnable,
     board: chess.Board,
     template_type: TemplateType = TemplateType.STATE,
-) -> ChessMove:
+    tool_messages: list[ToolMessage] | None = None,
+):
     match template_type:
         case TemplateType.MOVES:
             input = {"moves": _get_moves_str(board)}
         case TemplateType.STATE:
             input = {"state": _get_state_str(board)}
-    chain = get_template(template_type) | model
+    if not tool_messages:
+        tool_messages = []
+    chain = get_template(template_type, tool_messages) | model
     return chain.invoke(input)
 
 
@@ -65,10 +71,29 @@ def llm_move(
     board: chess.Board,
     model_provider: ModelProvider,
     model_name: str = "llama3.2",
-    template_type: TemplateType = TemplateType.STATE,
-) -> ChessMove:
-    return _invoke_model(
-        _get_model(model_provider, model_name),
-        board,
-        template_type,
-    )
+    template_type: TemplateType = TemplateType.MOVES,
+):
+    tools = {
+        "square_info": square_info_tool_factory(board),
+        "make_move": make_move,
+    }
+
+    model = _get_model(model_provider, model_name, list(tools.values()))
+    messages = []
+
+    while True:
+        print("Invoking model...")
+        response = _invoke_model(model, board, template_type, messages)
+        messages.append(response)
+
+        if response.tool_calls:
+            for tool_call in response.tool_calls:
+                print("Tool call:", tool_call)
+                tool = tools[tool_call["name"]]
+                tool_response = tool.invoke(tool_call)
+                print("Tool response:", tool_response.content)
+                if tool.name == "make_move":
+                    return ChessMove(move=tool_response.content)
+                messages.append(tool_response)
+        else:
+            raise ValueError("No tool calls found in the response.")

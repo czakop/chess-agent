@@ -1,8 +1,13 @@
 from enum import Enum
 
+from langchain_core.messages import BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
 
-SYSTEM_MESSAGE = "You are a professional chess player. You are playing a chess game with the black pieces."
+SYSTEM_MESSAGE = """
+You are a professional chess player. You are playing a chess game with the black pieces.
+Use the square_info tool to get information about a square on the chessboard before making a move.
+"""
+
 TEMPLATE_MOVES = """Here is the list of moves happened so far:
 
 {moves}
@@ -23,7 +28,9 @@ class TemplateType(str, Enum):
     STATE = TEMPLATE_STATE
 
 
-def get_template(template_type: TemplateType) -> ChatPromptTemplate:
+def get_template(
+    template_type: TemplateType, extra_messages: list[BaseMessage]
+) -> ChatPromptTemplate:
     return ChatPromptTemplate(
-        [("system", SYSTEM_MESSAGE), ("user", template_type.value)]
+        [("system", SYSTEM_MESSAGE), ("user", template_type.value), *extra_messages]
     )
