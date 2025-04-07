@@ -48,7 +48,22 @@ async def websocket_handler(websocket):
     )
     async for message in websocket:
         request = DTO.model_validate_json(message)
-        if request.action == "MOVE":
+        if request.action == "SETUP":
+            assert request.id and request.id in games
+            board: chess.Board = games[request.id]
+            try:
+                board.set_fen(request.fen)
+            except Exception as e:
+                print(e)
+                await websocket.send(
+                    DTO(
+                        id=request.id,
+                        action="ERROR",
+                        move=None,
+                        fen=board.fen(),
+                    ).model_dump_json()
+                )
+        elif request.action == "MOVE":
             assert request.id and request.id in games
             board: chess.Board = games[request.id]
             try:

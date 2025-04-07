@@ -21,19 +21,117 @@
       margin: 0;
       background: #f0f0f0;
     }
+
+    .page-container {
+      display: flex;
+      justify-content: space-between;
+      align-items: stretch;
+      width: 60%;
+      margin: 0 auto;
+      min-height: 600px;
+      border: 1px solid #ccc;
+    }
+
+    .main-content {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+    }
+
+    .board-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+    }
+
+    .button-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 20px;
+      padding: 10px;
+    }
+
+    .button-container button {
+      padding: 5px 10px;
+      margin-left: 5px;
+      font-size: 14px;
+      border: none;
+      background-color: #007BFF;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .button-container button:hover {
+      background-color: #0056b3;
+    }
   </style>
 </head>
 
 <body>
-  <div id="board" style="width: 400px;"></div>
+  <div class="page-container">
+    <div class="main-content">
+      <div class="board-container">
+        <div id="mainBoard" style="width: 400px;"></div>
+        <div id="editBoard" style="width: 400px; display: none;"></div>
+      </div>
+      <div class="button-container">
+        <button id="editBtn">Edit Board</button>
+        <button id="startBtn" hidden="true">Start Position</button>
+        <button id="clearBtn" hidden="true">Clear Board</button>
+      </div>
+    </div>
+  </div>
 
   <script>
-    var board = Chessboard('board', {
+    const wsUrl = "ws://localhost:8765";
+    const socket = new WebSocket(wsUrl);
+    var board_id = null
+    var edit_mode = false
+    var board = Chessboard('mainBoard', {
       draggable: true,
       position: 'start',
       pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
       onDrop: onDrop,
     });
+    var editBoard = Chessboard('editBoard', {
+      draggable: true,
+      position: 'start',
+      pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
+      sparePieces: true,
+      dropOffBoard: 'trash',
+    });
+
+    $('#startBtn').on('click', editBoard.start)
+    $('#clearBtn').on('click', editBoard.clear)
+    $('#editBtn').on('click', function () {
+      edit_mode = !edit_mode
+      $(this).text(edit_mode ? 'Done Editing' : 'Edit Board')
+      $('#startBtn').toggle(edit_mode)
+      $('#clearBtn').toggle(edit_mode)
+      if (edit_mode) {
+        editBoard.position(board.position());
+        document.getElementById('mainBoard').style.display = 'none';
+        document.getElementById('editBoard').style.display = 'block';
+      }
+      else {
+        board.position(editBoard.position());
+        document.getElementById('editBoard').style.display = 'none';
+        document.getElementById('mainBoard').style.display = 'block';
+        sendMessage({
+          "id": board_id,
+          "action": "SETUP",
+          "fen": board.fen(),
+          "move": null
+        })
+      }
+    })
 
     function onDrop(source, target) {
       move = {
@@ -49,11 +147,6 @@
         return 'snapback'
       }
     }
-
-
-    const wsUrl = "ws://localhost:8765";
-    const socket = new WebSocket(wsUrl);
-    var board_id = null
 
     socket.onopen = function (event) {
       console.log("WebSocket connection established.");
