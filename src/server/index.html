@@ -12,6 +12,7 @@
   <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"
     integrity="sha384-8Vi8VHwn3vjQ9eUHUxex3JSN/NFqUg3QbPyX8kWyb93+8AC/pPWTzj+nHtbC5bxD"
     crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js"></script>
   <style>
     body {
       display: flex;
@@ -146,8 +147,14 @@
       </div>
       <div class="button-container">
         <button id="editBtn">Edit Board</button>
+        <button id="flipBtn">Flip Board</button>
         <button id="startBtn" hidden="true">Start Position</button>
         <button id="clearBtn" hidden="true">Clear Board</button>
+        <select id="turnDropdown" hidden="true">
+          <option value="whiteToMove">White to move</option>
+          <option value="blackToMove">Black to move</option>
+        </select>
+
       </div>
     </div>
     <div class="chat-container">
@@ -164,11 +171,15 @@
     const socket = new WebSocket(wsUrl);
     var board_id = null
     var edit_mode = false
+    var turn = 'w';
+    var game = new Chess();
     var board = Chessboard('mainBoard', {
       draggable: true,
       position: 'start',
       pieceTheme: 'https://chessboardjs.com/img/chesspieces/wikipedia/{piece}.png',
       onDrop: onDrop,
+      onDragStart: onDragStart,
+      onSnapEnd: onSnapEnd,
     });
     var editBoard = Chessboard('editBoard', {
       draggable: true,
@@ -178,44 +189,81 @@
       dropOffBoard: 'trash',
     });
 
+    document.getElementById('turnDropdown').addEventListener('change', function () {
+      turn = this.value === 'whiteToMove' ? 'w' : 'b';
+    })
     $('#startBtn').on('click', editBoard.start)
     $('#clearBtn').on('click', editBoard.clear)
+    $('#flipBtn').on('click', function () {
+      board.flip()
+      editBoard.flip()
+    })
     $('#editBtn').on('click', function () {
       edit_mode = !edit_mode
       $(this).text(edit_mode ? 'Done Editing' : 'Edit Board')
+      $('#turnDropdown').toggle(edit_mode)
       $('#startBtn').toggle(edit_mode)
       $('#clearBtn').toggle(edit_mode)
       if (edit_mode) {
-        editBoard.position(board.position());
+        editBoard.position(board.position(), false);
         document.getElementById('mainBoard').style.display = 'none';
         document.getElementById('editBoard').style.display = 'block';
       }
       else {
-        board.position(editBoard.position());
+        fenParts = game.fen().split(' ')
+        game.load(`${editBoard.fen()} ${turn} ${fenParts[2]} - ${fenParts.slice(-2).join(' ')}`)
+        board.position(editBoard.position(), false);
         document.getElementById('editBoard').style.display = 'none';
         document.getElementById('mainBoard').style.display = 'block';
         sendMessage({
           "id": board_id,
           "action": "SETUP",
-          "fen": board.fen(),
+          "fen": game.fen(),
           "move": null
         })
       }
     })
 
+    function onDragStart(source, piece, position, orientation) {
+      if (game.game_over()) return false
+
+      if ((game.turn() === 'w' && piece.search(/^b/) !== -1) ||
+        (game.turn() === 'b' && piece.search(/^w/) !== -1)) {
+        return false
+      }
+    }
+
     function onDrop(source, target) {
-      move = {
+      var move = game.move({
+        from: source,
+        to: target,
+        promotion: 'q' // NOTE: always promote to a queen for now
+      })
+
+      if (move === null) return 'snapback'
+
+      msg = {
         "id": board_id,
         "action": "MOVE",
-        "move": { source, target }
+        "move": {
+          "source": source,
+          "target": target,
+          "promotion": null
+        }
       }
-      console.log("sending move:", move)
+
+      console.log("sending move:", msg)
+
       try {
-        sendMessage(move)
+        sendMessage(msg)
       } catch (error) {
         console.error(error.data)
         return 'snapback'
       }
+    }
+
+    function onSnapEnd() {
+      board.position(game.fen())
     }
 
     socket.onopen = function (event) {
@@ -231,11 +279,17 @@
           console.log("Game has been started with board id:", board_id)
         }
         else if (msg.action == "MOVE") {
-          board.move(`${msg.move.source}-${msg.move.target}`)
+          game.move({
+            from: msg.move.source,
+            to: msg.move.target,
+            promotion: msg.move.promotion
+          })
+          board.position(game.fen())
         } else if (msg.action == "CHAT") {
           appendMessage(msg.text, 'received');
         } else {
-          board.position(msg.fen)
+          game.load(msg.fen)
+          board.position(game.fen())
         }
       } catch (error) {
         console.error("Error parsing message:", error);
