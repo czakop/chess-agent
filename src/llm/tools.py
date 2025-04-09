@@ -5,15 +5,27 @@ from ..server.model import DTO, Move
 from .utils import get_color_name
 
 
-@tool
-def make_move(move: str) -> str:
-    """
-    Make a move on the chessboard.
+def make_move_tool_factory(board: chess.Board) -> BaseTool:
 
-    Args:
-        move (str): The move to make. It should be in algebraic notation (e.g., e5 or Nf6).
-    """
-    return move
+    @tool
+    async def make_move(move: str) -> str:
+        """
+        Make a move on the chessboard.
+
+        Args:
+            move (str): The move to make. It should be in algebraic notation (e.g., e5 or Nf6).
+        """
+        parsed_move = board.push_san(move.strip())
+        await board.websocket.send(
+            DTO(
+                id=board.id,
+                action="MOVE",
+                move=Move.from_uci(parsed_move.uci()),
+            ).model_dump_json()
+        )
+        return f"Move made: {parsed_move.uci()}"
+
+    return make_move
 
 
 def board_state_tool_factory(board: chess.Board) -> BaseTool:

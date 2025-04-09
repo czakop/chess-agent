@@ -5,12 +5,11 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMe
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 
-from .model import ChessMove
 from .prompts import TemplateType, get_template
 from .tools import (
     board_state_tool_factory,
     legal_moves_tool_factory,
-    make_move,
+    make_move_tool_factory,
     mark_square_tool_factory,
     marked_squares_tool_factory,
     square_info_tool_factory,
@@ -73,7 +72,9 @@ async def llm_move(
         "board_state": board_state_tool_factory(board),
         "legal_moves": legal_moves_tool_factory(board),
         "square_info": square_info_tool_factory(board),
-        "make_move": make_move,
+        "marked_squares": marked_squares_tool_factory(board),
+        "mark_square": mark_square_tool_factory(board),
+        "make_move": make_move_tool_factory(board),
     }
 
     model = _get_model(model_provider, model_name, list(tools.values()))
@@ -93,11 +94,11 @@ async def llm_move(
             for tool_call in response.tool_calls:
                 print("Tool call:", tool_call)
                 tool = tools[tool_call["name"]]
-                tool_response = tool.invoke(tool_call)
+                tool_response = await tool.ainvoke(tool_call)
                 print("Tool response:", tool_response.content)
-                if tool.name == "make_move":
-                    return ChessMove(move=tool_response.content)
                 messages.append(tool_response)
+                if tool.name == "make_move":
+                    break
         else:
             raise ValueError("No tool calls found in the response.")
 
@@ -115,6 +116,7 @@ async def llm_message(
         "square_info": square_info_tool_factory(board),
         "marked_squares": marked_squares_tool_factory(board),
         "mark_square": mark_square_tool_factory(board),
+        "make_move": make_move_tool_factory(board),
     }
 
     model = _get_model(model_provider, model_name, list(tools.values()))

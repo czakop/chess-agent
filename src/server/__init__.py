@@ -62,20 +62,12 @@ async def websocket_handler(websocket):
                     ).model_dump_json()
                 )
 
-                next_move = await llm_move(
+                await llm_move(
                     board,
                     chat_history,
                     ModelProvider.OPENAI,
                     "gpt-4o-mini",
                     TemplateType.STATE,
-                )
-                move = board.push_san(next_move.move.strip())
-                await websocket.send(
-                    DTO(
-                        id=request.id,
-                        action="MOVE",
-                        move=Move.from_uci(move.uci()),
-                    ).model_dump_json()
                 )
             except Exception as e:
                 print(e)
