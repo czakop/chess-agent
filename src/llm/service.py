@@ -11,6 +11,8 @@ from .tools import (
     board_state_tool_factory,
     legal_moves_tool_factory,
     make_move,
+    mark_square_tool_factory,
+    marked_squares_tool_factory,
     square_info_tool_factory,
 )
 from .utils import get_color_name
@@ -42,7 +44,7 @@ def _get_model(
     return model
 
 
-def _invoke_model(
+async def _invoke_model(
     model: Runnable,
     board: chess.Board,
     template: TemplateType | None = None,
@@ -57,10 +59,10 @@ def _invoke_model(
         message_history = []
     chain = get_template(message_history, template, tool_messages) | model
     print("Invoking model...")
-    return chain.invoke(input)
+    return await chain.ainvoke(input)
 
 
-def llm_move(
+async def llm_move(
     board: chess.Board,
     message_history: list[BaseMessage],
     model_provider: ModelProvider,
@@ -78,7 +80,7 @@ def llm_move(
     messages = []
 
     while True:
-        response = _invoke_model(
+        response = await _invoke_model(
             model,
             board,
             template_type,
@@ -100,7 +102,7 @@ def llm_move(
             raise ValueError("No tool calls found in the response.")
 
 
-def llm_message(
+async def llm_message(
     board: chess.Board,
     message_history: list[BaseMessage],
     user_message: str,
@@ -111,6 +113,8 @@ def llm_message(
         "board_state": board_state_tool_factory(board),
         "legal_moves": legal_moves_tool_factory(board),
         "square_info": square_info_tool_factory(board),
+        "marked_squares": marked_squares_tool_factory(board),
+        "mark_square": mark_square_tool_factory(board),
     }
 
     model = _get_model(model_provider, model_name, list(tools.values()))
@@ -118,7 +122,7 @@ def llm_message(
     message_history.append(HumanMessage(content=user_message))
 
     while True:
-        response = _invoke_model(
+        response = await _invoke_model(
             model,
             board,
             message_history=message_history,
@@ -130,7 +134,7 @@ def llm_message(
             for tool_call in response.tool_calls:
                 print("Tool call:", tool_call)
                 tool = tools[tool_call["name"]]
-                tool_response = tool.invoke(tool_call)
+                tool_response = await tool.ainvoke(tool_call)
                 print("Tool response:", tool_response.content)
                 messages.append(tool_response)
         else:

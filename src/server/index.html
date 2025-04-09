@@ -141,7 +141,7 @@
 <body>
   <div class="page-container">
     <div class="main-content">
-      <div class="board-container">
+      <div class="board-container" id="board-container">
         <div id="mainBoard" style="width: 400px;"></div>
         <div id="editBoard" style="width: 400px; display: none;"></div>
       </div>
@@ -172,6 +172,12 @@
     var board_id = null
     var edit_mode = false
     var turn = 'w';
+    var markers = {};
+    var dragStartSquare = null;
+    var whiteSquareGrey = '#a9a9a9'
+    var blackSquareGrey = '#696969'
+    var boardContainer = document.getElementById("board-container");
+
     var game = new Chess();
     var board = Chessboard('mainBoard', {
       draggable: true,
@@ -223,6 +229,83 @@
         })
       }
     })
+
+    function getSquareAtCoordinates(clientX, clientY) {
+      var elem = document.elementFromPoint(clientX, clientY);
+      if (!elem) return null;
+      var squareEl = elem.closest("[data-square]");
+      return squareEl ? squareEl.getAttribute("data-square") : null;
+    }
+
+    function toggleMarker(square) {
+      var $square = $('#mainBoard .square-' + square)
+      if (square in markers) {
+        $square.css('background', '')
+        delete markers[square];
+      } else {
+        var background = whiteSquareGrey
+        if ($square.hasClass('black-3c85d')) {
+          background = blackSquareGrey
+        }
+
+        $square.css('background', background)
+        markers[square] = true;
+      }
+    }
+
+    function clearAllMarkers() {
+      $('#mainBoard .square-55d63').css('background', '')
+      markers = {};
+    }
+
+    boardContainer.addEventListener("contextmenu", function (e) {
+      e.preventDefault();
+    });
+
+    boardContainer.addEventListener("mousedown", function (e) {
+      if (e.button === 0) {
+        Object.keys(markers).forEach(function (square) {
+          try {
+            sendMessage({
+              "id": board_id,
+              "action": "MARKER",
+              "move": {
+                "source": square,
+                "target": square,
+              }
+            });
+          } catch (error) {
+            console.error(error.data)
+          }
+        });
+        clearAllMarkers();
+        return;
+      }
+      if (e.button === 2) {
+        dragStartSquare = getSquareAtCoordinates(e.clientX, e.clientY);
+      }
+    });
+
+    boardContainer.addEventListener("mouseup", function (e) {
+      if (e.button === 2) {
+        if (dragStartSquare) {
+          toggleMarker(dragStartSquare);
+          try {
+            sendMessage({
+              "id": board_id,
+              "action": "MARKER",
+              "move": {
+                "source": dragStartSquare,
+                "target": dragStartSquare,
+              }
+            })
+          } catch (error) {
+            console.error(error.data)
+          }
+        }
+        dragStartSquare = null;
+      }
+    });
 
     function onDragStart(source, piece, position, orientation) {
       if (game.game_over()) return false
@@ -277,8 +360,7 @@
         if (msg.action == "START") {
           board_id = msg.id
           console.log("Game has been started with board id:", board_id)
-        }
-        else if (msg.action == "MOVE") {
+        } else if (msg.action == "MOVE") {
           game.move({
             from: msg.move.source,
             to: msg.move.target,
@@ -287,6 +369,12 @@
           board.position(game.fen())
         } else if (msg.action == "CHAT") {
           appendMessage(msg.text, 'received');
+        } else if (msg.action == "MARKER") {
+          if (msg.move) {
+            toggleMarker(msg.move.source);
+          } else {
+            clearAllMarkers();
+          }
         } else {
           game.load(msg.fen)
           board.position(game.fen())

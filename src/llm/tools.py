@@ -1,6 +1,7 @@
 import chess
 from langchain_core.tools import BaseTool, tool
 
+from ..server.model import DTO, Move
 from .utils import get_color_name
 
 
@@ -75,6 +76,48 @@ def legal_moves_tool_factory(board: chess.Board) -> BaseTool:
         return f"Legal moves from {chess.square_name(square)}: {_legal_moves_from_square(board, square)}"
 
     return legal_moves
+
+
+def mark_square_tool_factory(board: chess.Board) -> BaseTool:
+
+    @tool
+    async def mark_square(square: str):
+        """
+        Mark a square on the chessboard (removes the mark if it is already marked).
+
+        Args:
+            square (str): The name of the square (e.g., e4, f6).
+        """
+        if not hasattr(board, "markers"):
+            board.markers = []
+
+        if square in board.markers:
+            board.markers.remove(square)
+        else:
+            board.markers.append(square)
+        await board.websocket.send(
+            DTO(
+                id=board.id,
+                action="MARKER",
+                move=Move(source=square, target=square),
+            ).model_dump_json()
+        )
+
+    return mark_square
+
+
+def marked_squares_tool_factory(board: chess.Board) -> BaseTool:
+
+    @tool
+    def marked_squares() -> str:
+        """
+        Get the marked squares on the chessboard.
+        """
+        if not hasattr(board, "markers"):
+            return "No marked squares."
+        return f"Marked squares: {', '.join(board.markers)}"
+
+    return marked_squares
 
 
 def _get_piece_info_on_square(board: chess.Board, square: chess.Square) -> str:

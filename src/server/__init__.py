@@ -4,34 +4,13 @@ import uuid
 import chess
 from aiohttp import web
 from dotenv import load_dotenv
-from pydantic import BaseModel
 from websockets.asyncio.server import serve
 
 from ..llm.prompts import TemplateType
 from ..llm.service import ModelProvider, llm_message, llm_move
+from .model import DTO, Move
 
 load_dotenv()
-
-
-class Move(BaseModel):
-    source: str
-    target: str
-    promotion: str | None = None
-
-    @staticmethod
-    def from_uci(uci: str):
-        return Move(source=uci[:2], target=uci[2:4], promotion=uci[4:])
-
-    def to_uci(self):
-        return self.source + self.target + (self.promotion or "")
-
-
-class DTO(BaseModel):
-    id: str | None
-    action: str
-    move: Move | None = None
-    fen: str | None = None
-    text: str | None = None
 
 
 games = {}
@@ -41,6 +20,8 @@ chat_messages = {}
 async def websocket_handler(websocket):
     board_id = str(uuid.uuid4())
     board = chess.Board()
+    board.id = board_id
+    board.websocket = websocket
     games[board_id] = board
     chat_messages[board_id] = []
     await websocket.send(
@@ -81,7 +62,7 @@ async def websocket_handler(websocket):
                     ).model_dump_json()
                 )
 
-                next_move = llm_move(
+                next_move = await llm_move(
                     board,
                     chat_history,
                     ModelProvider.OPENAI,
@@ -111,7 +92,7 @@ async def websocket_handler(websocket):
             board: chess.Board = games[request.id]
             message_history = chat_messages[request.id]
             try:
-                response = llm_message(
+                response = await llm_message(
                     board,
                     message_history,
                     request.text,
@@ -135,6 +116,16 @@ async def websocket_handler(websocket):
                         fen=board.fen(),
                     ).model_dump_json()
                 )
+        elif request.action == "MARKER":
+            assert request.id and request.id in games
+            board: chess.Board = games[request.id]
+            square = request.move.source
+            if not hasattr(board, "markers"):
+                board.markers = []
+            if square in board.markers:
+                board.markers.remove(square)
+            else:
+                board.markers.append(square)
 
 
 async def index(request):
