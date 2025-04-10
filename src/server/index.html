@@ -162,8 +162,9 @@
         <div id="editBoard" style="width: 400px; display: none;"></div>
       </div>
       <div class="button-container">
-        <button id="editBtn" class="edit-btn" title="Edit"><i id="icon" class="fa-solid fa-pen"></i></button>
-        <button id="flipBtn" class="flip-board-btn" title="Flip Chess Board"><i class="fa-solid fa-repeat"></i></button>
+        <button id="undoBtn" class="undo-btn" title="Undo previous move"><i class="fa-solid fa-angle-left"></i></i></button>
+        <button id="editBtn" class="edit-btn" title="Edit board"><i id="icon" class="fa-solid fa-pen"></i></button>
+        <button id="flipBtn" class="flip-board-btn" title="Flip Board"><i class="fa-solid fa-repeat"></i></button>
         <button id="startBtn" class="reset-position-btn" title="Reset Starting Position" hidden="true"><i
             class="fa-solid fa-rotate-left"></i></button>
         <button id="clearBtn" class="clear-board-btn" title="Clear Board" hidden="true"><i
@@ -229,14 +230,13 @@
         icon.classList.remove('fa-pen');
         icon.classList.add('fa-check');
         this.setAttribute('title', 'Done Editing');
-        this.setAttribute('aria-label', 'Done Editing');
       } else {
         icon.classList.remove('fa-check');
         icon.classList.add('fa-pen');
-        this.setAttribute('title', 'Edit');
-        this.setAttribute('aria-label', 'Edit');
+        this.setAttribute('title', 'Edit Board');
       }
 
+      $('#undoBtn').toggle(!edit_mode)
       $('#turnDropdown').toggle(edit_mode)
       $('#startBtn').toggle(edit_mode)
       $('#clearBtn').toggle(edit_mode)
@@ -258,6 +258,14 @@
           "move": null
         })
       }
+    })
+    $('#undoBtn').on('click', function () {
+      game.undo()
+      board.position(game.fen())
+      sendMessage({
+        "id": board_id,
+        "action": "UNDO"
+      })
     })
 
     function getSquareAtCoordinates(clientX, clientY) {

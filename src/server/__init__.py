@@ -28,25 +28,14 @@ async def websocket_handler(websocket):
     )
     async for message in websocket:
         request = DTO.model_validate_json(message)
-        if request.action == "SETUP":
-            assert request.id and request.id in games
-            board = games[request.id]
-            try:
+        try:
+            if request.action == "SETUP":
+                assert request.id and request.id in games
+                board = games[request.id]
                 board.set_fen(request.fen)
-            except Exception as e:
-                print(e)
-                await websocket.send(
-                    DTO(
-                        id=request.id,
-                        action="ERROR",
-                        move=None,
-                        fen=board.fen(),
-                    ).model_dump_json()
-                )
-        elif request.action == "MOVE":
-            assert request.id and request.id in games
-            board = games[request.id]
-            try:
+            elif request.action == "MOVE":
+                assert request.id and request.id in games
+                board = games[request.id]
                 move = board.push_uci(request.move.to_uci())
                 await websocket.send(
                     DTO(
@@ -55,55 +44,47 @@ async def websocket_handler(websocket):
                         move=Move.from_uci(move.uci()),
                     ).model_dump_json()
                 )
-
                 await llm_move(
                     board,
                     ModelProvider.OPENAI,
                     "gpt-4o-mini",
                     TemplateType.STATE,
                 )
-            except Exception as e:
-                print(e)
-                await websocket.send(
-                    DTO(
-                        id=request.id,
-                        action="ERROR",
-                        move=None,
-                        fen=board.fen(),
-                    ).model_dump_json()
-                )
-        elif request.action == "CHAT":
-            assert request.id and request.id in games
-            board = games[request.id]
-            if not request.text:
-                board.message_history.clear()
-                print("Clearing message history")
-                continue
-            try:
+            elif request.action == "UNDO":
+                assert request.id and request.id in games
+                board = games[request.id]
+                board.pop()
+            elif request.action == "CHAT":
+                assert request.id and request.id in games
+                board = games[request.id]
+                if not request.text:
+                    board.message_history.clear()
+                    print("Clearing message history")
+                    continue
                 await llm_message(
                     board,
                     request.text,
                     ModelProvider.OPENAI,
                     "gpt-4o-mini",
                 )
-            except Exception as e:
-                print(e)
-                await websocket.send(
-                    DTO(
-                        id=request.id,
-                        action="ERROR",
-                        move=None,
-                        fen=board.fen(),
-                    ).model_dump_json()
-                )
-        elif request.action == "MARKER":
-            assert request.id and request.id in games
-            board = games[request.id]
-            square = request.move.source
-            if square in board.markers:
-                board.markers.remove(square)
-            else:
-                board.markers.append(square)
+            elif request.action == "MARKER":
+                assert request.id and request.id in games
+                board = games[request.id]
+                square = request.move.source
+                if square in board.markers:
+                    board.markers.remove(square)
+                else:
+                    board.markers.append(square)
+        except Exception as e:
+            print(e)
+            await websocket.send(
+                DTO(
+                    id=request.id,
+                    action="ERROR",
+                    move=None,
+                    fen=board.fen(),
+                ).model_dump_json()
+            )
 
 
 async def index(request):
