@@ -1,6 +1,6 @@
 from enum import Enum
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
+from langchain_core.messages import BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 
@@ -12,7 +12,9 @@ from .tools import (
     make_move_tool_factory,
     mark_square_tool_factory,
     marked_squares_tool_factory,
+    send_message_tool_factory,
     square_info_tool_factory,
+    stop_interaction,
 )
 from .utils import get_color_name
 
@@ -74,6 +76,8 @@ async def llm_move(
         "marked_squares": marked_squares_tool_factory(board),
         "mark_square": mark_square_tool_factory(board),
         "make_move": make_move_tool_factory(board),
+        "send_message": send_message_tool_factory(board),
+        "stop_interaction": stop_interaction,
     }
 
     model = _get_model(model_provider, model_name, list(tools.values()))
@@ -93,11 +97,12 @@ async def llm_move(
             for tool_call in response.tool_calls:
                 print("Tool call:", tool_call)
                 tool = tools[tool_call["name"]]
+                if tool.name == "stop_interaction":
+                    print("Finishing interaction.")
+                    return
                 tool_response = await tool.ainvoke(tool_call)
                 print("Tool response:", tool_response.content)
                 messages.append(tool_response)
-                if tool.name == "make_move":
-                    break
         else:
             raise ValueError("No tool calls found in the response.")
 
@@ -107,7 +112,7 @@ async def llm_message(
     user_message: str,
     model_provider: ModelProvider,
     model_name: str = "llama3.2",
-) -> AIMessage:
+):
     tools = {
         "board_state": board_state_tool_factory(board),
         "legal_moves": legal_moves_tool_factory(board),
@@ -115,6 +120,8 @@ async def llm_message(
         "marked_squares": marked_squares_tool_factory(board),
         "mark_square": mark_square_tool_factory(board),
         "make_move": make_move_tool_factory(board),
+        "send_message": send_message_tool_factory(board),
+        "stop_interaction": stop_interaction,
     }
 
     model = _get_model(model_provider, model_name, list(tools.values()))
@@ -134,9 +141,11 @@ async def llm_message(
             for tool_call in response.tool_calls:
                 print("Tool call:", tool_call)
                 tool = tools[tool_call["name"]]
+                if tool.name == "stop_interaction":
+                    print("Finishing interaction.")
+                    return
                 tool_response = await tool.ainvoke(tool_call)
                 print("Tool response:", tool_response.content)
                 messages.append(tool_response)
         else:
-            board.message_history.append(response)
-            return response
+            raise ValueError("No tool calls found in the response.")

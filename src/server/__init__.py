@@ -76,18 +76,11 @@ async def websocket_handler(websocket):
             assert request.id and request.id in games
             board = games[request.id]
             try:
-                response = await llm_message(
+                await llm_message(
                     board,
                     request.text,
                     ModelProvider.OPENAI,
                     "gpt-4o-mini",
-                )
-                await websocket.send(
-                    DTO(
-                        id=request.id,
-                        action="CHAT",
-                        text=response.content,
-                    ).model_dump_json()
                 )
             except Exception as e:
                 print(e)

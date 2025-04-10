@@ -1,3 +1,4 @@
+from langchain_core.messages import AIMessage
 from langchain_core.tools import BaseTool, tool
 
 import chess
@@ -30,6 +31,29 @@ def make_move_tool_factory(board: Board) -> BaseTool:
     return make_move
 
 
+def send_message_tool_factory(board: Board) -> BaseTool:
+
+    @tool
+    async def send_message(message: str) -> str:
+        """
+        Send a chat message to the user.
+
+        Args:
+            message (str): The text message to send.
+        """
+        await board.websocket.send(
+            DTO(
+                id=board.id,
+                action="CHAT",
+                text=message,
+            ).model_dump_json()
+        )
+        board.message_history.append(AIMessage(content=message))
+        return f"Message sent: {message}"
+
+    return send_message
+
+
 def board_state_tool_factory(board: Board) -> BaseTool:
 
     @tool
@@ -37,6 +61,9 @@ def board_state_tool_factory(board: Board) -> BaseTool:
         """
         Get the current state of the chessboard.
         """
+        if _is_starting_position(board):
+            return "The chessboard is in the starting position."
+
         piece_map = "\n".join(
             [
                 f"{chess.square_name(s)}: {"white" if p.color == chess.WHITE else "black"} {chess.piece_name(p.piece_type)}"
@@ -131,6 +158,14 @@ def marked_squares_tool_factory(board: Board) -> BaseTool:
     return marked_squares
 
 
+@tool
+def stop_interaction() -> str:
+    """
+    Stop the current interaction with the chessboard.
+    """
+    return "Interaction stopped."
+
+
 def _get_piece_info_on_square(board: Board, square: chess.Square) -> str:
     piece = board.piece_at(square)
     if piece is None:
@@ -157,3 +192,7 @@ def _get_attackers(board: Board, square: chess.Square, color: chess.Color) -> st
             for s in attackers
         ]
     )
+
+
+def _is_starting_position(board: Board) -> bool:
+    return board.fen().split(" ")[0] == chess.STARTING_FEN.split(" ")[0]
