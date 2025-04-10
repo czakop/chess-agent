@@ -1,11 +1,13 @@
-import chess
 from langchain_core.tools import BaseTool, tool
 
+import chess
+
+from ..chess import Board
 from ..server.model import DTO, Move
 from .utils import get_color_name
 
 
-def make_move_tool_factory(board: chess.Board) -> BaseTool:
+def make_move_tool_factory(board: Board) -> BaseTool:
 
     @tool
     async def make_move(move: str) -> str:
@@ -28,7 +30,7 @@ def make_move_tool_factory(board: chess.Board) -> BaseTool:
     return make_move
 
 
-def board_state_tool_factory(board: chess.Board) -> BaseTool:
+def board_state_tool_factory(board: Board) -> BaseTool:
 
     @tool
     def board_state() -> str:
@@ -52,7 +54,7 @@ def board_state_tool_factory(board: chess.Board) -> BaseTool:
     return board_state
 
 
-def square_info_tool_factory(board: chess.Board) -> BaseTool:
+def square_info_tool_factory(board: Board) -> BaseTool:
 
     @tool
     def square_info(square_name: str) -> str:
@@ -74,7 +76,7 @@ def square_info_tool_factory(board: chess.Board) -> BaseTool:
     return square_info
 
 
-def legal_moves_tool_factory(board: chess.Board) -> BaseTool:
+def legal_moves_tool_factory(board: Board) -> BaseTool:
 
     @tool
     def legal_moves(square_name: str) -> str:
@@ -90,7 +92,7 @@ def legal_moves_tool_factory(board: chess.Board) -> BaseTool:
     return legal_moves
 
 
-def mark_square_tool_factory(board: chess.Board) -> BaseTool:
+def mark_square_tool_factory(board: Board) -> BaseTool:
 
     @tool
     async def mark_square(square: str):
@@ -100,9 +102,6 @@ def mark_square_tool_factory(board: chess.Board) -> BaseTool:
         Args:
             square (str): The name of the square (e.g., e4, f6).
         """
-        if not hasattr(board, "markers"):
-            board.markers = []
-
         if square in board.markers:
             board.markers.remove(square)
         else:
@@ -118,21 +117,21 @@ def mark_square_tool_factory(board: chess.Board) -> BaseTool:
     return mark_square
 
 
-def marked_squares_tool_factory(board: chess.Board) -> BaseTool:
+def marked_squares_tool_factory(board: Board) -> BaseTool:
 
     @tool
     def marked_squares() -> str:
         """
         Get the marked squares on the chessboard.
         """
-        if not hasattr(board, "markers"):
+        if not board.markers:
             return "No marked squares."
         return f"Marked squares: {', '.join(board.markers)}"
 
     return marked_squares
 
 
-def _get_piece_info_on_square(board: chess.Board, square: chess.Square) -> str:
+def _get_piece_info_on_square(board: Board, square: chess.Square) -> str:
     piece = board.piece_at(square)
     if piece is None:
         return f"No piece on {chess.square_name(square)}"
@@ -140,14 +139,14 @@ def _get_piece_info_on_square(board: chess.Board, square: chess.Square) -> str:
     return f"There is a {color} {chess.piece_name(piece.piece_type)} on {chess.square_name(square)}."
 
 
-def _legal_moves_from_square(board: chess.Board, square: chess.Square) -> str:
+def _legal_moves_from_square(board: Board, square: chess.Square) -> str:
     legal_moves = [m.uci() for m in board.legal_moves if m.from_square == square]
     if not legal_moves:
         return f"No legal moves from {chess.square_name(square)}."
     return ", ".join(legal_moves)
 
 
-def _get_attackers(board: chess.Board, square: chess.Square, color: chess.Color) -> str:
+def _get_attackers(board: Board, square: chess.Square, color: chess.Color) -> str:
     attackers = board.attackers(color, square)
     color_name = get_color_name(color)
     if not attackers:

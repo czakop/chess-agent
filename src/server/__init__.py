@@ -1,29 +1,24 @@
 import asyncio
 import uuid
 
-import chess
 from aiohttp import web
 from dotenv import load_dotenv
 from websockets.asyncio.server import serve
 
+from ..chess import Board
 from ..llm.prompts import TemplateType
 from ..llm.service import ModelProvider, llm_message, llm_move
 from .model import DTO, Move
 
 load_dotenv()
 
-
-games = {}
-chat_messages = {}
+games: dict[str, Board] = {}
 
 
 async def websocket_handler(websocket):
     board_id = str(uuid.uuid4())
-    board = chess.Board()
-    board.id = board_id
-    board.websocket = websocket
+    board = Board(board_id, websocket)
     games[board_id] = board
-    chat_messages[board_id] = []
     await websocket.send(
         DTO(
             id=board_id,
@@ -35,7 +30,7 @@ async def websocket_handler(websocket):
         request = DTO.model_validate_json(message)
         if request.action == "SETUP":
             assert request.id and request.id in games
-            board: chess.Board = games[request.id]
+            board = games[request.id]
             try:
                 board.set_fen(request.fen)
             except Exception as e:
@@ -50,8 +45,7 @@ async def websocket_handler(websocket):
                 )
         elif request.action == "MOVE":
             assert request.id and request.id in games
-            board: chess.Board = games[request.id]
-            chat_history = chat_messages[request.id]
+            board = games[request.id]
             try:
                 move = board.push_uci(request.move.to_uci())
                 await websocket.send(
@@ -64,7 +58,6 @@ async def websocket_handler(websocket):
 
                 await llm_move(
                     board,
-                    chat_history,
                     ModelProvider.OPENAI,
                     "gpt-4o-mini",
                     TemplateType.STATE,
@@ -81,12 +74,10 @@ async def websocket_handler(websocket):
                 )
         elif request.action == "CHAT":
             assert request.id and request.id in games
-            board: chess.Board = games[request.id]
-            message_history = chat_messages[request.id]
+            board = games[request.id]
             try:
                 response = await llm_message(
                     board,
-                    message_history,
                     request.text,
                     ModelProvider.OPENAI,
                     "gpt-4o-mini",
@@ -110,10 +101,8 @@ async def websocket_handler(websocket):
                 )
         elif request.action == "MARKER":
             assert request.id and request.id in games
-            board: chess.Board = games[request.id]
+            board = games[request.id]
             square = request.move.source
-            if not hasattr(board, "markers"):
-                board.markers = []
             if square in board.markers:
                 board.markers.remove(square)
             else:

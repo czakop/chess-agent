@@ -1,10 +1,10 @@
 from enum import Enum
 
-import chess
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 
+from ..chess import Board
 from .prompts import TemplateType, get_template
 from .tools import (
     board_state_tool_factory,
@@ -45,7 +45,7 @@ def _get_model(
 
 async def _invoke_model(
     model: Runnable,
-    board: chess.Board,
+    board: Board,
     template: TemplateType | None = None,
     message_history: list[BaseMessage] | None = None,
     tool_messages: list[ToolMessage] | None = None,
@@ -62,8 +62,7 @@ async def _invoke_model(
 
 
 async def llm_move(
-    board: chess.Board,
-    message_history: list[BaseMessage],
+    board: Board,
     model_provider: ModelProvider,
     model_name: str = "llama3.2",
     template_type: TemplateType = TemplateType.STATE,
@@ -85,7 +84,7 @@ async def llm_move(
             model,
             board,
             template_type,
-            message_history=message_history,
+            message_history=board.message_history,
             tool_messages=messages,
         )
         messages.append(response)
@@ -104,8 +103,7 @@ async def llm_move(
 
 
 async def llm_message(
-    board: chess.Board,
-    message_history: list[BaseMessage],
+    board: Board,
     user_message: str,
     model_provider: ModelProvider,
     model_name: str = "llama3.2",
@@ -121,13 +119,13 @@ async def llm_message(
 
     model = _get_model(model_provider, model_name, list(tools.values()))
     messages = []
-    message_history.append(HumanMessage(content=user_message))
+    board.message_history.append(HumanMessage(content=user_message))
 
     while True:
         response = await _invoke_model(
             model,
             board,
-            message_history=message_history,
+            message_history=board.message_history,
             tool_messages=messages,
         )
         messages.append(response)
@@ -140,5 +138,5 @@ async def llm_message(
                 print("Tool response:", tool_response.content)
                 messages.append(tool_response)
         else:
-            message_history.append(response)
+            board.message_history.append(response)
             return response
