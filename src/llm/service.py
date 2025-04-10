@@ -86,8 +86,11 @@ async def llm_move(
                 print("Tool response:", tool_response.content)
                 messages.append(tool_response)
         else:
-            raise ValueError(
-                "No tool calls found in the response. Content: " + response.content
+            messages.append(response)
+            messages.append(
+                HumanMessage(
+                    "Your last message did not contain a tool call. Please try again. Use 'make_move' to make a move, 'send_message' to send a message, or 'stop_interaction' to finish the interaction."
+                )
             )
 
 
@@ -123,6 +126,9 @@ async def llm_message(
                 print("Tool response:", tool_response.content)
                 messages.append(tool_response)
         else:
-            raise ValueError(
-                "No tool calls found in the response. Content: " + response.content
+            messages.append(response)
+            messages.append(
+                HumanMessage(
+                    "Your last message did not contain a tool call. Please try again. Use 'make_move' to make a move, 'send_message' to send a message, or 'stop_interaction' to finish the interaction."
+                )
             )
