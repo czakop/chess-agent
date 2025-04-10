@@ -9,6 +9,7 @@
     crossorigin="anonymous"></script>
   <link rel="stylesheet" href="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.css"
     integrity="sha384-q94+BZtLrkL1/ohfjR8c6L+A6qzNH9R2hBLwyoAfu3i/WCvQjzL2RQJ3uNHDISdU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://unpkg.com/@chrisoakman/chessboardjs@1.0.0/dist/chessboard-1.0.0.min.js"
     integrity="sha384-8Vi8VHwn3vjQ9eUHUxex3JSN/NFqUg3QbPyX8kWyb93+8AC/pPWTzj+nHtbC5bxD"
     crossorigin="anonymous"></script>
@@ -53,7 +54,7 @@
     .button-container {
       display: flex;
       justify-content: center;
-      gap: 10px;
+      gap: 5px;
       margin-top: 20px;
       padding: 10px;
     }
@@ -74,7 +75,7 @@
     }
 
     .chat-container {
-      width: 300px;
+      width: 350px;
       display: flex;
       flex-direction: column;
       background-color: #fff;
@@ -135,6 +136,21 @@
     .chat-input button:hover {
       background-color: #0056b3;
     }
+
+    .chat-input .trash-btn {
+      padding: 5px 10px;
+      margin-left: 5px;
+      font-size: 14px;
+      border: none;
+      background-color: #dc3545;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    .chat-input .trash-btn:hover {
+      background-color: #bd2130;
+    }
   </style>
 </head>
 
@@ -146,22 +162,24 @@
         <div id="editBoard" style="width: 400px; display: none;"></div>
       </div>
       <div class="button-container">
-        <button id="editBtn">Edit Board</button>
-        <button id="flipBtn">Flip Board</button>
-        <button id="startBtn" hidden="true">Start Position</button>
-        <button id="clearBtn" hidden="true">Clear Board</button>
+        <button id="editBtn" class="edit-btn" title="Edit"><i id="icon" class="fa-solid fa-pen"></i></button>
+        <button id="flipBtn" class="flip-board-btn" title="Flip Chess Board"><i class="fa-solid fa-repeat"></i></button>
+        <button id="startBtn" class="reset-position-btn" title="Reset Starting Position" hidden="true"><i
+            class="fa-solid fa-rotate-left"></i></button>
+        <button id="clearBtn" class="clear-board-btn" title="Clear Board" hidden="true"><i
+            class="fa-solid fa-eraser"></i></button>
         <select id="turnDropdown" hidden="true">
           <option value="whiteToMove">White to move</option>
           <option value="blackToMove">Black to move</option>
         </select>
-
       </div>
     </div>
     <div class="chat-container">
       <div class="chat-history" id="chatHistory"></div>
       <div class="chat-input">
         <input type="text" id="chatInput" placeholder="Type your message...">
-        <button id="sendBtn">Send</button>
+        <button id="sendBtn" class="send-btn" title="Send Message"><i class="fa-solid fa-paper-plane"></i></button>
+        <button id="trashBtn" class="trash-btn" title="Clear Histroy"><i class="fa-solid fa-trash"></i></button>
       </div>
     </div>
   </div>
@@ -206,7 +224,19 @@
     })
     $('#editBtn').on('click', function () {
       edit_mode = !edit_mode
-      $(this).text(edit_mode ? 'Done Editing' : 'Edit Board')
+      var icon = document.getElementById('icon');
+      if (edit_mode) {
+        icon.classList.remove('fa-pen');
+        icon.classList.add('fa-check');
+        this.setAttribute('title', 'Done Editing');
+        this.setAttribute('aria-label', 'Done Editing');
+      } else {
+        icon.classList.remove('fa-check');
+        icon.classList.add('fa-pen');
+        this.setAttribute('title', 'Edit');
+        this.setAttribute('aria-label', 'Edit');
+      }
+
       $('#turnDropdown').toggle(edit_mode)
       $('#startBtn').toggle(edit_mode)
       $('#clearBtn').toggle(edit_mode)
@@ -401,6 +431,7 @@
     }
 
     const sendBtn = document.getElementById('sendBtn');
+    const trashBtn = document.getElementById('trashBtn');
     const chatInput = document.getElementById('chatInput');
     const chatHistory = document.getElementById('chatHistory');
 
@@ -411,6 +442,16 @@
       chatHistory.appendChild(messageElem);
       chatHistory.scrollTop = chatHistory.scrollHeight;
     }
+
+
+    trashBtn.addEventListener('click', () => {
+      chatHistory.innerHTML = '';
+      sendMessage({
+        "id": board_id,
+        "action": "CHAT",
+        "text": null
+      });
+    });
 
     sendBtn.addEventListener('click', () => {
       const message = chatInput.value.trim();

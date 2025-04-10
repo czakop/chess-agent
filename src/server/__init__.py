@@ -75,6 +75,10 @@ async def websocket_handler(websocket):
         elif request.action == "CHAT":
             assert request.id and request.id in games
             board = games[request.id]
+            if not request.text:
+                board.message_history.clear()
+                print("Clearing message history")
+                continue
             try:
                 await llm_message(
                     board,
