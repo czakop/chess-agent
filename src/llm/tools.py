@@ -12,10 +12,12 @@ class Toolbelt:
     def __init__(self, board: Board):
         self.tools = {
             "make_move": make_move_tool_factory(board),
-            "send_message": send_message_tool_factory(board),
             "board_state": board_state_tool_factory(board),
             "square_info": square_info_tool_factory(board),
             "legal_moves": legal_moves_tool_factory(board),
+            "is_check": is_check_tool_factory(board),
+            "gives_check": gives_check_tool_factory(board),
+            "send_message": send_message_tool_factory(board),
             "mark_square": mark_square_tool_factory(board),
             "marked_squares": marked_squares_tool_factory(board),
             "stop_interaction": stop_interaction,
@@ -106,7 +108,7 @@ def square_info_tool_factory(board: Board) -> BaseTool:
     @tool
     def square_info(square_name: str) -> str:
         """
-        Get information about a square on the chessboard (piece, legal moves, attackers).
+        Get information about a square on the chessboard (piece, attackers and defenders).
 
         Args:
             square_name (str): The name of the square (e.g., e4, f6).
@@ -137,6 +139,39 @@ def legal_moves_tool_factory(board: Board) -> BaseTool:
         return f"Legal moves from {chess.square_name(square)}: {_legal_moves_from_square(board, square)}"
 
     return legal_moves
+
+
+def is_check_tool_factory(board: Board) -> BaseTool:
+
+    @tool
+    def is_check() -> str:
+        """
+        Check if the current position is a check.
+        """
+        if board.is_check():
+            return "The position is a check. Checkers: " + _get_checkers(board)
+        return "The position is not a check."
+
+    return is_check
+
+
+def gives_check_tool_factory(board: Board) -> BaseTool:
+
+    @tool
+    def gives_check(move: str) -> str:
+        """
+        Check if a move gives check.
+
+        Args:
+            move (str): The move to check. It should be in algebraic notation (e.g., e5 or Nf6).
+        """
+        parsed_move = board.parse_san(move.strip())
+        if board.gives_check(parsed_move):
+            return f"The move {move} gives check."
+        else:
+            return f"The move {move} does not give check."
+
+    return gives_check
 
 
 def mark_square_tool_factory(board: Board) -> BaseTool:
@@ -210,6 +245,18 @@ def _get_attackers(board: Board, square: chess.Square, color: chess.Color) -> st
         [
             f"{chess.piece_name(board.piece_at(s).piece_type)} on {chess.square_name(s)}"
             for s in attackers
+        ]
+    )
+
+
+def _get_checkers(board: Board) -> str:
+    checkers = board.checkers()
+    if not checkers:
+        return "No checkers."
+    return ", ".join(
+        [
+            f"{chess.piece_name(board.piece_at(s).piece_type)} on {chess.square_name(s)}"
+            for s in checkers
         ]
     )
 

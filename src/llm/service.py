@@ -86,7 +86,9 @@ async def llm_move(
                 print("Tool response:", tool_response.content)
                 messages.append(tool_response)
         else:
-            raise ValueError("No tool calls found in the response.")
+            raise ValueError(
+                "No tool calls found in the response. Content: " + response.content
+            )
 
 
 async def llm_message(
@@ -121,4 +123,6 @@ async def llm_message(
                 print("Tool response:", tool_response.content)
                 messages.append(tool_response)
         else:
-            raise ValueError("No tool calls found in the response.")
+            raise ValueError(
+                "No tool calls found in the response. Content: " + response.content
+            )
