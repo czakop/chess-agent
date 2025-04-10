@@ -6,16 +6,7 @@ from langchain_core.tools import BaseTool
 
 from ..chess import Board
 from .prompts import TemplateType, get_template
-from .tools import (
-    board_state_tool_factory,
-    legal_moves_tool_factory,
-    make_move_tool_factory,
-    mark_square_tool_factory,
-    marked_squares_tool_factory,
-    send_message_tool_factory,
-    square_info_tool_factory,
-    stop_interaction,
-)
+from .tools import Toolbelt
 from .utils import get_color_name
 
 
@@ -69,18 +60,9 @@ async def llm_move(
     model_name: str = "llama3.2",
     template_type: TemplateType = TemplateType.STATE,
 ):
-    tools = {
-        "board_state": board_state_tool_factory(board),
-        "legal_moves": legal_moves_tool_factory(board),
-        "square_info": square_info_tool_factory(board),
-        "marked_squares": marked_squares_tool_factory(board),
-        "mark_square": mark_square_tool_factory(board),
-        "make_move": make_move_tool_factory(board),
-        "send_message": send_message_tool_factory(board),
-        "stop_interaction": stop_interaction,
-    }
+    toolbelt = Toolbelt(board)
 
-    model = _get_model(model_provider, model_name, list(tools.values()))
+    model = _get_model(model_provider, model_name, tools=toolbelt.get_tools())
     messages = []
 
     while True:
@@ -96,7 +78,7 @@ async def llm_move(
         if response.tool_calls:
             for tool_call in response.tool_calls:
                 print("Tool call:", tool_call)
-                tool = tools[tool_call["name"]]
+                tool = toolbelt[tool_call["name"]]
                 if tool.name == "stop_interaction":
                     print("Finishing interaction.")
                     return
@@ -113,18 +95,9 @@ async def llm_message(
     model_provider: ModelProvider,
     model_name: str = "llama3.2",
 ):
-    tools = {
-        "board_state": board_state_tool_factory(board),
-        "legal_moves": legal_moves_tool_factory(board),
-        "square_info": square_info_tool_factory(board),
-        "marked_squares": marked_squares_tool_factory(board),
-        "mark_square": mark_square_tool_factory(board),
-        "make_move": make_move_tool_factory(board),
-        "send_message": send_message_tool_factory(board),
-        "stop_interaction": stop_interaction,
-    }
+    toolbelt = Toolbelt(board)
 
-    model = _get_model(model_provider, model_name, list(tools.values()))
+    model = _get_model(model_provider, model_name, tools=toolbelt.get_tools())
     messages = []
     board.message_history.append(HumanMessage(content=user_message))
 
@@ -140,7 +113,7 @@ async def llm_message(
         if response.tool_calls:
             for tool_call in response.tool_calls:
                 print("Tool call:", tool_call)
-                tool = tools[tool_call["name"]]
+                tool = toolbelt[tool_call["name"]]
                 if tool.name == "stop_interaction":
                     print("Finishing interaction.")
                     return

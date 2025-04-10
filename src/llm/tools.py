@@ -8,6 +8,26 @@ from ..server.model import DTO, Move
 from .utils import get_color_name
 
 
+class Toolbelt:
+    def __init__(self, board: Board):
+        self.tools = {
+            "make_move": make_move_tool_factory(board),
+            "send_message": send_message_tool_factory(board),
+            "board_state": board_state_tool_factory(board),
+            "square_info": square_info_tool_factory(board),
+            "legal_moves": legal_moves_tool_factory(board),
+            "mark_square": mark_square_tool_factory(board),
+            "marked_squares": marked_squares_tool_factory(board),
+            "stop_interaction": stop_interaction,
+        }
+
+    def get_tools(self) -> list[BaseTool]:
+        return list(self.tools.values())
+
+    def __getitem__(self, item: str) -> BaseTool:
+        return self.tools[item]
+
+
 def make_move_tool_factory(board: Board) -> BaseTool:
 
     @tool
