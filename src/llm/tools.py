@@ -12,11 +12,10 @@ class Toolbelt:
     def __init__(self, board: Board):
         self.tools = {
             "make_move": make_move_tool_factory(board),
-            "board_state": board_state_tool_factory(board),
-            "square_info": square_info_tool_factory(board),
-            "legal_moves": legal_moves_tool_factory(board),
-            "is_check": is_check_tool_factory(board),
-            "gives_check": gives_check_tool_factory(board),
+            "get_position": get_position_tool_factory(board),
+            "get_moves": get_moves_tool_factory(board),
+            "get_square_info": get_square_info_tool_factory(board),
+            "analyse_move": analyse_move_tool_factory(board),
             "send_message": send_message_tool_factory(board),
             "mark_square": mark_square_tool_factory(board),
             "marked_squares": marked_squares_tool_factory(board),
@@ -58,7 +57,7 @@ def send_message_tool_factory(board: Board) -> BaseTool:
     @tool
     async def send_message(message: str) -> str:
         """
-        Send a chat message to the user.
+        Send a chat message to the user. this is the only way to send a message to the user.
 
         Args:
             message (str): The text message to send.
@@ -76,10 +75,10 @@ def send_message_tool_factory(board: Board) -> BaseTool:
     return send_message
 
 
-def board_state_tool_factory(board: Board) -> BaseTool:
+def get_position_tool_factory(board: Board) -> BaseTool:
 
     @tool
-    def board_state() -> str:
+    def get_position() -> str:
         """
         Get the current state of the chessboard.
         """
@@ -94,21 +93,49 @@ def board_state_tool_factory(board: Board) -> BaseTool:
             ]
         )
 
-        return f"""Here is the current state of the chess game:
+        move_history = board.move_stack
 
+        result = f"""Here is the current state of the chess game:
+    
         {piece_map}
 
-        It is {get_color_name(board.turn)}'s turn."""
+        """
 
-    return board_state
+        if 0 < len(move_history) < 20:
+            result += f"Move history: {chess.Board().variation_san(board.move_stack)}\n"
+
+        result += f"""It is {get_color_name(board.turn)}'s turn.
+        
+        {_is_check(board)}"""
+
+        return result
+
+    return get_position
 
 
-def square_info_tool_factory(board: Board) -> BaseTool:
+def get_moves_tool_factory(board: Board) -> BaseTool:
 
     @tool
-    def square_info(square_name: str) -> str:
+    def get_moves() -> str:
         """
-        Get information about a square on the chessboard (piece, attackers and defenders).
+        Get the list of moves made in the game.
+        """
+        moves = board.move_stack
+        if not moves:
+            if _is_starting_position(board):
+                return "No moves have been made yet."
+            return "The move history is unavailable, but the game is not in the starting position."
+        return "Moves made: " + chess.Board().variation_san(board.move_stack)
+
+    return get_moves
+
+
+def get_square_info_tool_factory(board: Board) -> BaseTool:
+
+    @tool
+    def get_square_info(square_name: str) -> str:
+        """
+        Get information about a square on the chessboard (piece, legal moves, attackers and defenders).
 
         Args:
             square_name (str): The name of the square (e.g., e4, f6).
@@ -116,62 +143,39 @@ def square_info_tool_factory(board: Board) -> BaseTool:
         square = chess.parse_square(square_name)
         return "\n".join(
             [
-                f"Piece: {_get_piece_info_on_square(board, square)}",
-                f"White attackers: {_get_attackers(board, square, chess.WHITE)}",
-                f"Black attackers: {_get_attackers(board, square, chess.BLACK)}",
+                _get_piece_info_on_square(board, square),
+                _get_attackers(board, square, chess.WHITE),
+                _get_attackers(board, square, chess.BLACK),
             ]
         )
 
-    return square_info
+    return get_square_info
 
 
-def legal_moves_tool_factory(board: Board) -> BaseTool:
+def analyse_move_tool_factory(board: Board) -> BaseTool:
 
     @tool
-    def legal_moves(square_name: str) -> str:
+    def analyse_move(move: str) -> str:
         """
-        Get legal moves from a square on the chessboard.
+        Analyse a move to see if it is legal and if it gives check.
 
         Args:
-            square_name (str): The name of the square (e.g., e4, f6).
+            move (str): The move to analyse. It should be in algebraic notation (e.g., e5 or Nf6).
         """
-        square = chess.parse_square(square_name)
-        return f"Legal moves from {chess.square_name(square)}: {_legal_moves_from_square(board, square)}"
-
-    return legal_moves
-
-
-def is_check_tool_factory(board: Board) -> BaseTool:
-
-    @tool
-    def is_check() -> str:
-        """
-        Check if the current position is a check.
-        """
-        if board.is_check():
-            return "The position is a check. Checkers: " + _get_checkers(board)
-        return "The position is not a check."
-
-    return is_check
-
-
-def gives_check_tool_factory(board: Board) -> BaseTool:
-
-    @tool
-    def gives_check(move: str) -> str:
-        """
-        Check if a move gives check.
-
-        Args:
-            move (str): The move to check. It should be in algebraic notation (e.g., e5 or Nf6).
-        """
-        parsed_move = board.parse_san(move.strip())
+        try:
+            parsed_move = board.parse_san(move.strip())
+            if not board.is_legal(parsed_move):
+                raise chess.IllegalMoveError("Illegal move")
+        except Exception:
+            return f"The move {move} is illegal."
+        result = f"The move {move} is legal."
         if board.gives_check(parsed_move):
-            return f"The move {move} gives check."
+            result += f" It gives check."
         else:
-            return f"The move {move} does not give check."
+            result += f" It does not give check."
+        return result
 
-    return gives_check
+    return analyse_move
 
 
 def mark_square_tool_factory(board: Board) -> BaseTool:
@@ -226,22 +230,32 @@ def _get_piece_info_on_square(board: Board, square: chess.Square) -> str:
     if piece is None:
         return f"No piece on {chess.square_name(square)}"
     color = get_color_name(piece.color)
-    return f"There is a {color} {chess.piece_name(piece.piece_type)} on {chess.square_name(square)}."
-
-
-def _legal_moves_from_square(board: Board, square: chess.Square) -> str:
+    result = f"There is a {color} {chess.piece_name(piece.piece_type)} on {chess.square_name(square)}."
     legal_moves = [m.uci() for m in board.legal_moves if m.from_square == square]
     if not legal_moves:
-        return f"No legal moves from {chess.square_name(square)}."
-    return ", ".join(legal_moves)
+        result += f" It can't move because"
+        if board.turn != piece.color:
+            result += f" it is not {get_color_name(board.turn)}'s turn."
+        elif board.is_pinned(piece.color, square):
+            result += f" it is pinned."
+        elif board.is_check():
+            result += f" it is a check."
+        else:
+            result += f" it is blocked."
+        result += f" However, it attacks the following squares: {', '.join([chess.square_name(s) for s in board.attacks(square)])}."
+    else:
+        result += f" It can move to the following squares: {', '.join(legal_moves)}."
+    return result
 
 
 def _get_attackers(board: Board, square: chess.Square, color: chess.Color) -> str:
+    piece = board.piece_at(square)
+    title = "attackers" if piece is None or piece.color != color else "defenders"
     attackers = board.attackers(color, square)
     color_name = get_color_name(color)
     if not attackers:
-        return f"No {color_name} attackers for {chess.square_name(square)}"
-    return ", ".join(
+        return f"No {color_name} {title} for {chess.square_name(square)}"
+    return f"{color_name.title()} {title} for {chess.square_name(square)}: " + ", ".join(
         [
             f"{chess.piece_name(board.piece_at(s).piece_type)} on {chess.square_name(s)}"
             for s in attackers
@@ -259,6 +273,12 @@ def _get_checkers(board: Board) -> str:
             for s in checkers
         ]
     )
+
+
+def _is_check(board: Board) -> str:
+    if board.is_check():
+        return "The position is a check. Checkers: " + _get_checkers(board)
+    return "The position is not a check."
 
 
 def _is_starting_position(board: Board) -> bool:
