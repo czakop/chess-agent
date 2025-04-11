@@ -111,7 +111,6 @@ async def llm_message(
     while True:
         response = await _invoke_model(
             model,
-            board,
             message_history=board.message_history,
             tool_messages=messages,
         )
