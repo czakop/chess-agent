@@ -39,7 +39,10 @@ def make_move_tool_factory(board: Board) -> BaseTool:
         Args:
             move (str): The move to make. It should be in algebraic notation (e.g., e5 or Nf6).
         """
-        parsed_move = board.push_san(move.strip())
+        try:
+            parsed_move = board.push_san(move.strip())
+        except ValueError as e:
+            return f"Could not parse the move. Error description: {e.__doc__}"
         await board.websocket.send(
             DTO(
                 id=board.id,
