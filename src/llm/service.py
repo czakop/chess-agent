@@ -38,19 +38,19 @@ def _get_model(
 
 async def _invoke_model(
     model: Runnable,
-    board: Board,
     template: TemplateType | None = None,
+    input: dict[str, str] | None = None,
     message_history: list[BaseMessage] | None = None,
     tool_messages: list[ToolMessage] | None = None,
 ):
-    side_to_move = get_color_name(board.turn)
-    input = {"side_to_move": side_to_move}
-    if not tool_messages:
+    if input is None:
+        input = {}
+    if tool_messages is None:
         tool_messages = []
-    if not message_history:
+    if message_history is None:
         message_history = []
     chain = get_template(message_history, template, tool_messages) | model
-    print("Invoking model...")
+    print("Invoking model with input:", input)
     return await chain.ainvoke(input)
 
 
@@ -61,6 +61,8 @@ async def llm_move(
     template_type: TemplateType = TemplateType.STATE,
 ):
     toolbelt = Toolbelt(board)
+    side_to_move = get_color_name(board.turn)
+    input = {"side_to_move": side_to_move}
 
     model = _get_model(model_provider, model_name, tools=toolbelt.get_tools())
     messages = []
@@ -68,8 +70,8 @@ async def llm_move(
     while True:
         response = await _invoke_model(
             model,
-            board,
             template_type,
+            input,
             message_history=board.message_history,
             tool_messages=messages,
         )
