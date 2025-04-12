@@ -162,7 +162,8 @@
         <div id="editBoard" style="width: 400px; display: none;"></div>
       </div>
       <div class="button-container">
-        <button id="undoBtn" class="undo-btn" title="Undo previous move"><i class="fa-solid fa-angle-left"></i></i></button>
+        <button id="undoBtn" class="undo-btn" title="Undo previous move"><i
+            class="fa-solid fa-angle-left"></i></i></button>
         <button id="editBtn" class="edit-btn" title="Edit board"><i id="icon" class="fa-solid fa-pen"></i></button>
         <button id="flipBtn" class="flip-board-btn" title="Flip Board"><i class="fa-solid fa-repeat"></i></button>
         <button id="startBtn" class="reset-position-btn" title="Reset Starting Position" hidden="true"><i
@@ -246,22 +247,26 @@
         document.getElementById('editBoard').style.display = 'block';
       }
       else {
-        fenParts = game.fen().split(' ')
-        game.load(`${editBoard.fen()} ${turn} ${fenParts[2]} - ${fenParts.slice(-2).join(' ')}`)
-        board.position(editBoard.position(), false);
+        if (board.fen() !== editBoard.fen() || game.turn() !== turn) {
+          fenParts = game.fen().split(' ')
+          game.load(`${editBoard.fen()} ${turn} ${fenParts[2]} - ${fenParts.slice(-2).join(' ')}`)
+          board.position(editBoard.position(), false);
+          sendMessage({
+            "id": board_id,
+            "action": "SETUP",
+            "fen": game.fen(),
+            "move": null
+          })
+        }
         document.getElementById('editBoard').style.display = 'none';
         document.getElementById('mainBoard').style.display = 'block';
-        sendMessage({
-          "id": board_id,
-          "action": "SETUP",
-          "fen": game.fen(),
-          "move": null
-        })
       }
     })
     $('#undoBtn').on('click', function () {
       game.undo()
       board.position(game.fen())
+      turn = game.turn()
+      document.getElementById('turnDropdown').value = turn === 'w' ? 'whiteToMove' : 'blackToMove'
       sendMessage({
         "id": board_id,
         "action": "UNDO"
