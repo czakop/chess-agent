@@ -1,10 +1,10 @@
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.tools import BaseTool, tool
 
 import chess
 
+from ..api import DTO, Move
 from ..chess import Board
-from ..server.model import DTO, Move
 from .utils import get_color_name
 
 

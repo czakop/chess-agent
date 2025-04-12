@@ -5,10 +5,10 @@ from aiohttp import web
 from dotenv import load_dotenv
 from websockets.asyncio.server import serve
 
+from ..api import DTO, Move
 from ..chess import Board
 from ..llm.prompts import TemplateType
 from ..llm.service import ModelProvider, llm_message, llm_move
-from .model import DTO, Move
 
 load_dotenv()
 
