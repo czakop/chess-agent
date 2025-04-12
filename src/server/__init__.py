@@ -33,6 +33,7 @@ async def websocket_handler(websocket):
                 assert request.id and request.id in games
                 board = games[request.id]
                 board.set_fen(request.fen)
+                board.fen0 = request.fen
             elif request.action == "MOVE":
                 assert request.id and request.id in games
                 board = games[request.id]

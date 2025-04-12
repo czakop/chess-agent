@@ -53,7 +53,7 @@ def make_move_tool_factory(board: Board) -> BaseTool:
         try:
             parsed_move = board.push_san(move.strip())
         except ValueError as e:
-            return f"Could not parse the move. Error description: {e.__doc__}"
+            return f"Could not make the move. Error description: {e.__doc__}"
         await board.websocket.send(
             DTO(
                 id=board.id,
@@ -84,7 +84,7 @@ def send_message_tool_factory(board: Board) -> BaseTool:
             ).model_dump_json()
         )
         board.message_history.append(AIMessage(content=message))
-        return f"Message sent: {message}"
+        return f"Message sent."
 
     return send_message
 
@@ -107,7 +107,7 @@ def get_position_tool_factory(board: Board) -> BaseTool:
 
         move_history = board.move_stack
         if 0 < len(move_history) < 20:
-            result += f"Move history: {chess.Board().variation_san(board.move_stack)}\n"
+            result += f"Move history: {chess.Board(fen=board.fen0).variation_san(board.move_stack)}\n"
 
         result += f"It is {get_color_name(board.turn)}'s turn. {_is_check(board)}"
 
@@ -171,7 +171,7 @@ def analyse_move_tool_factory(board: Board) -> BaseTool:
                 raise chess.IllegalMoveError("Illegal move")
         except Exception:
             return f"The move {move} is illegal."
-        result = f"The move {move} is legal."
+        result = f"The move {board.lan(parsed_move)} is legal."
 
         if board.gives_check(parsed_move):
             result += f" It gives check."
@@ -244,8 +244,7 @@ def stop_interaction() -> str:
     """
     Stop the current interaction with the chessboard.
     """
-    print("Finishing interaction.")
-    raise InteractionFinishedException("Interaction finished.")
+    return "Interaction finished."
 
 
 def _get_piece_map(board: Board) -> str:
@@ -264,7 +263,11 @@ def _get_piece_info_on_square(board: Board, square: chess.Square) -> str:
         return f"No piece on {chess.square_name(square)}"
     color = get_color_name(piece.color)
     result = f"There is a {color} {chess.piece_name(piece.piece_type)} on {chess.square_name(square)}."
-    legal_moves = [m.uci() for m in board.legal_moves if m.from_square == square]
+    legal_moves = [
+        chess.square_name(m.to_square)
+        for m in board.legal_moves
+        if m.from_square == square
+    ]
     if not legal_moves:
         result += f" It can't move because"
         if board.turn != piece.color:

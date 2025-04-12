@@ -29,11 +29,9 @@ class TemplateType(str, Enum):
 def get_template(
     message_history: list[BaseMessage],
     template_type: TemplateType | None,
-    extra_messages: list[BaseMessage],
 ) -> ChatPromptTemplate:
     messages = [("system", SYSTEM_MESSAGE)]
     messages.extend(message_history)
     if template_type:
         messages.append(("user", template_type.value))
-    messages.extend(extra_messages)
     return ChatPromptTemplate(messages)

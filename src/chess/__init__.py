@@ -10,3 +10,4 @@ class Board(chess.Board):
         self.websocket = websocket
         self.markers = []
         self.message_history = []
+        self.fen0 = self.starting_fen
