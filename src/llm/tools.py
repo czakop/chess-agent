@@ -88,28 +88,17 @@ def get_position_tool_factory(board: Board) -> BaseTool:
         if _is_starting_position(board):
             return "The chessboard is in the starting position."
 
-        piece_map = "\n".join(
-            [
-                f"{chess.square_name(s)}: {"white" if p.color == chess.WHITE else "black"} {chess.piece_name(p.piece_type)}"
-                for s, p in board.piece_map().items()
-                if p
-            ]
-        )
-
-        move_history = board.move_stack
-
         result = f"""Here is the current state of the chess game:
     
-        {piece_map}
+        {_get_piece_map(board)}
 
         """
 
+        move_history = board.move_stack
         if 0 < len(move_history) < 20:
             result += f"Move history: {chess.Board().variation_san(board.move_stack)}\n"
 
-        result += f"""It is {get_color_name(board.turn)}'s turn.
-        
-        {_is_check(board)}"""
+        result += f"It is {get_color_name(board.turn)}'s turn. {_is_check(board)}"
 
         return result
 
@@ -160,7 +149,7 @@ def analyse_move_tool_factory(board: Board) -> BaseTool:
     @tool
     def analyse_move(move: str) -> str:
         """
-        Analyse a move to see if it is legal and if it gives check.
+        Analyse a move to see if it is legal, if it gives check, and if it captures a piece.
 
         Args:
             move (str): The move to analyse. It should be in algebraic notation (e.g., e5 or Nf6).
@@ -172,10 +161,29 @@ def analyse_move_tool_factory(board: Board) -> BaseTool:
         except Exception:
             return f"The move {move} is illegal."
         result = f"The move {move} is legal."
+
         if board.gives_check(parsed_move):
             result += f" It gives check."
         else:
             result += f" It does not give check."
+
+        to_square = parsed_move.to_square
+        captured_piece = board.piece_at(to_square)
+        if captured_piece:
+            result += f" It captures a {get_color_name(captured_piece.color)} {chess.piece_name(captured_piece.piece_type)}."
+        else:
+            result += f" It does not capture any piece."
+
+        board.push(parsed_move)
+        result += "\n".join(
+            [
+                f" It attacks the following squares: {', '.join([chess.square_name(s) for s in board.attacks(to_square)])}.",
+                _get_attackers(board, to_square, chess.WHITE),
+                _get_attackers(board, to_square, chess.BLACK),
+            ]
+        )
+        board.pop()
+
         return result
 
     return analyse_move
@@ -226,6 +234,16 @@ def stop_interaction() -> str:
     Stop the current interaction with the chessboard.
     """
     return "Interaction stopped."
+
+
+def _get_piece_map(board: Board) -> str:
+    return "\n".join(
+        [
+            f"{chess.square_name(s)}: {get_color_name(p.color)} {chess.piece_name(p.piece_type)}{" (attacked)" if board.is_attacked_by(not p.color, s) else ""}"
+            for s, p in board.piece_map().items()
+            if p
+        ]
+    )
 
 
 def _get_piece_info_on_square(board: Board, square: chess.Square) -> str:
