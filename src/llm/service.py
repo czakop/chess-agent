@@ -6,7 +6,7 @@ from langchain_core.tools import BaseTool
 
 from ..chess import Board
 from .prompts import TemplateType, get_template
-from .tools import Toolbelt
+from .tools import InteractionFinishedException, Toolbelt
 from .utils import get_color_name
 
 
@@ -54,6 +54,41 @@ async def _invoke_model(
     return await chain.ainvoke(input)
 
 
+async def _invoke_agent(
+    model_provider: ModelProvider,
+    model_name: str,
+    toolbelt: Toolbelt,
+    message_history: list[BaseMessage],
+    template_type: TemplateType | None = None,
+    input: dict[str, str] | None = None,
+):
+    model = _get_model(model_provider, model_name, tools=toolbelt.get_tools())
+    messages = []
+
+    while True:
+        response = await _invoke_model(
+            model,
+            template_type,
+            input,
+            message_history=message_history,
+            tool_messages=messages,
+        )
+        messages.append(response)
+        try:
+            if response.tool_calls:
+                for tool_call in response.tool_calls:
+                    tool_response = await toolbelt(tool_call)
+                    messages.append(tool_response)
+            else:
+                messages.append(
+                    HumanMessage(
+                        "Your last message has lost as it did not contain a tool call. Please try again. Use 'make_move' to make a move, 'send_message' to send a message, or 'stop_interaction' to finish the interaction."
+                    )
+                )
+        except InteractionFinishedException:
+            return
+
+
 async def llm_move(
     board: Board,
     model_provider: ModelProvider,
@@ -64,36 +99,14 @@ async def llm_move(
     side_to_move = get_color_name(board.turn)
     input = {"side_to_move": side_to_move}
 
-    model = _get_model(model_provider, model_name, tools=toolbelt.get_tools())
-    messages = []
-
-    while True:
-        response = await _invoke_model(
-            model,
-            template_type,
-            input,
-            message_history=board.message_history,
-            tool_messages=messages,
-        )
-        messages.append(response)
-
-        if response.tool_calls:
-            for tool_call in response.tool_calls:
-                print("Tool call:", tool_call)
-                tool = toolbelt[tool_call["name"]]
-                if tool.name == "stop_interaction":
-                    print("Finishing interaction.")
-                    return
-                tool_response = await tool.ainvoke(tool_call)
-                print("Tool response:", tool_response.content)
-                messages.append(tool_response)
-        else:
-            messages.append(response)
-            messages.append(
-                HumanMessage(
-                    "Your last message has lost as it did not contain a tool call. Please try again. Use 'make_move' to make a move, 'send_message' to send a message, or 'stop_interaction' to finish the interaction."
-                )
-            )
+    await _invoke_agent(
+        model_provider,
+        model_name,
+        toolbelt,
+        board.message_history,
+        template_type,
+        input,
+    )
 
 
 async def llm_message(
@@ -103,33 +116,11 @@ async def llm_message(
     model_name: str = "llama3.2",
 ):
     toolbelt = Toolbelt(board)
-
-    model = _get_model(model_provider, model_name, tools=toolbelt.get_tools())
-    messages = []
     board.message_history.append(HumanMessage(content=user_message))
 
-    while True:
-        response = await _invoke_model(
-            model,
-            message_history=board.message_history,
-            tool_messages=messages,
-        )
-        messages.append(response)
-
-        if response.tool_calls:
-            for tool_call in response.tool_calls:
-                print("Tool call:", tool_call)
-                tool = toolbelt[tool_call["name"]]
-                if tool.name == "stop_interaction":
-                    print("Finishing interaction.")
-                    return
-                tool_response = await tool.ainvoke(tool_call)
-                print("Tool response:", tool_response.content)
-                messages.append(tool_response)
-        else:
-            messages.append(response)
-            messages.append(
-                HumanMessage(
-                    "Your last message has lost as it did not contain a tool call. Please try again. Use 'make_move' to make a move, 'send_message' to send a message, or 'stop_interaction' to finish the interaction."
-                )
-            )
+    await _invoke_agent(
+        model_provider,
+        model_name,
+        toolbelt,
+        board.message_history,
+    )

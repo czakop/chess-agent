@@ -1,4 +1,4 @@
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolCall
 from langchain_core.tools import BaseTool, tool
 
 import chess
@@ -6,6 +6,10 @@ import chess
 from ..api import DTO, Move
 from ..chess import Board
 from .utils import get_color_name
+
+
+class InteractionFinishedException(Exception):
+    pass
 
 
 class Toolbelt:
@@ -21,6 +25,13 @@ class Toolbelt:
             "marked_squares": marked_squares_tool_factory(board),
             "stop_interaction": stop_interaction,
         }
+
+    async def __call__(self, tool_call: ToolCall) -> BaseMessage:
+        print("Tool call:", tool_call)
+        tool = self[tool_call["name"]]
+        tool_response = await tool.ainvoke(tool_call)
+        print("Tool response:", tool_response.content)
+        return tool_response
 
     def get_tools(self) -> list[BaseTool]:
         return list(self.tools.values())
@@ -233,7 +244,8 @@ def stop_interaction() -> str:
     """
     Stop the current interaction with the chessboard.
     """
-    return "Interaction stopped."
+    print("Finishing interaction.")
+    raise InteractionFinishedException("Interaction finished.")
 
 
 def _get_piece_map(board: Board) -> str:
