@@ -1,3 +1,5 @@
+import random
+
 from websockets.asyncio.server import ServerConnection
 
 import chess
@@ -11,3 +13,9 @@ class Board(chess.Board):
         self.markers = []
         self.message_history = []
         self.fen0 = self.starting_fen
+
+    def random_move(self) -> chess.Move:
+        moves = list(self.legal_moves)
+        move = random.choice(moves)
+        self.push(move)
+        return move

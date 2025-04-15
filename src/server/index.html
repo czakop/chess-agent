@@ -166,6 +166,7 @@
             class="fa-solid fa-angle-left"></i></i></button>
         <button id="editBtn" class="edit-btn" title="Edit board"><i id="icon" class="fa-solid fa-pen"></i></button>
         <button id="flipBtn" class="flip-board-btn" title="Flip Board"><i class="fa-solid fa-repeat"></i></button>
+        <button id="moveBtn" class="move-btn" title="Random move"><i class="fa-solid fa-play"></i></button>
         <button id="startBtn" class="reset-position-btn" title="Reset Starting Position" hidden="true"><i
             class="fa-solid fa-rotate-left"></i></button>
         <button id="clearBtn" class="clear-board-btn" title="Clear Board" hidden="true"><i
@@ -238,6 +239,7 @@
       }
 
       $('#undoBtn').toggle(!edit_mode)
+      $('#moveBtn').toggle(!edit_mode)
       $('#turnDropdown').toggle(edit_mode)
       $('#startBtn').toggle(edit_mode)
       $('#clearBtn').toggle(edit_mode)
@@ -270,6 +272,13 @@
       sendMessage({
         "id": board_id,
         "action": "UNDO"
+      })
+    })
+    $('#moveBtn').on('click', function () {
+      sendMessage({
+        "id": board_id,
+        "action": "MOVE",
+        "move": null
       })
     })
 

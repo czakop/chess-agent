@@ -37,7 +37,17 @@ async def websocket_handler(websocket):
             elif request.action == "MOVE":
                 assert request.id and request.id in games
                 board = games[request.id]
-                move = board.push_uci(request.move.to_uci())
+                if request.move is None:
+                    move = board.random_move()
+                    await websocket.send(
+                        DTO(
+                            id=request.id,
+                            action="MOVE",
+                            move=Move.from_uci(move.uci()),
+                        ).model_dump_json()
+                    )
+                else:
+                    move = board.push_uci(request.move.to_uci())
                 await websocket.send(
                     DTO(
                         id=request.id,
